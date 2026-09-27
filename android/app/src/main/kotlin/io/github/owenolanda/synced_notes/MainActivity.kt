@@ -1,4 +1,4 @@
-package io.github.OwenOlanda.synced_notes
+package io.github.owenolanda.synced_notes
 
 import io.flutter.embedding.android.FlutterActivity
 
