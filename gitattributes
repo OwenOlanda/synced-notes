@@ -1,0 +1,8 @@
+# Guardar todos los archivos de texto con saltos de línea LF en el repositorio,
+# sin importar el sistema de quien contribuya. Git detecta solo los binarios.
+* text=auto eol=lf
+
+# Scripts de Windows que necesitan CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
