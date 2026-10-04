@@ -51,6 +51,9 @@ class Note {
   /// ¿El usuario le puso título?
   bool get hasTitle => title.trim().isNotEmpty;
 
+  /// Título para mostrar en pantalla.
+  String get displayTitle => hasTitle ? title : 'Sin título';
+
   /// ¿No tiene ni título ni texto? Las notas nuevas en blanco no se guardan.
   bool get isBlank => title.trim().isEmpty && content.trim().isEmpty;
 
