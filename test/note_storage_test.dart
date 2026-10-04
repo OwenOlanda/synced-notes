@@ -19,95 +19,165 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  test('crear una nota genera un .txt vacío con ese nombre', () async {
-    final note = await storage.createNote('Lista del súper');
+  // 3 de octubre de 2026, 20:59 con los segundos que se indiquen.
+  DateTime at(int second) => DateTime(2026, 10, 3, 20, 59, second);
 
-    expect(note.title, 'Lista del súper');
-    expect(note.content, '');
-    expect(File('${tempDir.path}/Lista del súper.txt').existsSync(), isTrue);
+  Note newNote({String title = '', String content = '', int second = 12}) =>
+      Note(
+        title: title,
+        content: content,
+        createdAt: at(second),
+        modifiedAt: at(second),
+      );
+
+  /// Nombres de los archivos en la carpeta, en orden alfabético.
+  List<String> files() => tempDir
+      .listSync()
+      .map((e) => e.path.split(Platform.pathSeparator).last)
+      .toList()
+    ..sort();
+
+  group('nombres de archivo', () {
+    test('con título y sin título', () {
+      expect(NoteStorage.fileNameFor('Lista del súper', at(12)),
+          '2026-10-03_20-59-12 Lista del súper.txt');
+      expect(NoteStorage.fileNameFor('   ', at(12)), '2026-10-03_20-59-12.txt');
+    });
+
+    test('se leen de vuelta: título y fecha', () {
+      final withTitle =
+          NoteStorage.parseFileName('2026-10-03_20-59-12 Ideas.txt');
+      expect(withTitle.title, 'Ideas');
+      expect(withTitle.createdAt, at(12));
+
+      final noTitle = NoteStorage.parseFileName('2026-10-03_20-59-12.txt');
+      expect(noTitle.title, '');
+      expect(noTitle.createdAt, at(12));
+
+      final foreign = NoteStorage.parseFileName('Compras.txt');
+      expect(foreign.title, 'Compras');
+      expect(foreign.createdAt, isNull);
+    });
   });
 
-  test('guardar y volver a leer conserva el texto (acentos incluidos)', () async {
-    await storage.createNote('Ideas');
-    await storage.saveNote(Note(
-      title: 'Ideas',
-      content: 'Año nuevo, ¡más café! ☕\nSegunda línea',
-      modifiedAt: DateTime.now(),
-    ));
+  group('guardar', () {
+    test('nota nueva con título: archivo con fecha + título', () async {
+      final saved = await storage.saveNote(
+          newNote(title: 'Ideas', content: 'Año nuevo, ¡más café! ☕\nOtra línea'));
 
-    final read = await storage.readNote('Ideas');
-    expect(read.content, 'Año nuevo, ¡más café! ☕\nSegunda línea');
+      expect(saved.fileName, '2026-10-03_20-59-12 Ideas.txt');
+      expect(saved.title, 'Ideas');
+      expect(saved.createdAt, at(12));
+      expect(files(), ['2026-10-03_20-59-12 Ideas.txt']);
+
+      final read = await storage.readNote(saved.fileName!);
+      expect(read.content, 'Año nuevo, ¡más café! ☕\nOtra línea');
+    });
+
+    test('nota nueva sin título: archivo solo con la fecha', () async {
+      final saved = await storage.saveNote(newNote(content: 'hola'));
+
+      expect(files(), ['2026-10-03_20-59-12.txt']);
+      expect(saved.hasTitle, isFalse);
+    });
+
+    test('dos notas creadas en el mismo segundo no comparten fecha', () async {
+      await storage.saveNote(newNote(title: 'Ideas'));
+      await storage.saveNote(newNote(title: 'Otra cosa'));
+
+      expect(files(), [
+        '2026-10-03_20-59-12 Ideas.txt',
+        '2026-10-03_20-59-13 Otra cosa.txt',
+      ]);
+    });
+
+    test('volver a guardar con el mismo título reemplaza el texto', () async {
+      final first = await storage.saveNote(newNote(title: 'A', content: 'uno'));
+      await storage.saveNote(first.copyWith(content: 'dos'));
+
+      expect(files(), ['2026-10-03_20-59-12 A.txt']); // sin temporales
+      expect((await storage.readNote(first.fileName!)).content, 'dos');
+    });
+
+    test('cambiar el título renombra el archivo y conserva la fecha', () async {
+      final first =
+          await storage.saveNote(newNote(title: 'Viejo', content: 'texto'));
+      final renamed = await storage.saveNote(first.copyWith(title: 'Nuevo'));
+
+      expect(files(), ['2026-10-03_20-59-12 Nuevo.txt']);
+      expect(renamed.title, 'Nuevo');
+      expect(renamed.content, 'texto');
+      expect(renamed.createdAt, at(12));
+    });
+
+    test('quitar el título deja solo la fecha', () async {
+      final first = await storage.saveNote(newNote(title: 'Algo', content: 'x'));
+      await storage.saveNote(first.copyWith(title: ''));
+
+      expect(files(), ['2026-10-03_20-59-12.txt']);
+    });
+
+    test('cambiar solo mayúsculas del título funciona (importante en Windows)',
+        () async {
+      final first = await storage.saveNote(newNote(title: 'ideas', content: 'x'));
+      final renamed = await storage.saveNote(first.copyWith(title: 'Ideas'));
+
+      expect(files(), ['2026-10-03_20-59-12 Ideas.txt']);
+      expect(renamed.content, 'x');
+    });
+
+    test('títulos inválidos se rechazan con un mensaje claro', () async {
+      expect(NoteStorage.validateTitle(''), isNull); // vacío está permitido
+      expect(NoteStorage.validateTitle('Hola'), isNull);
+      expect(NoteStorage.validateTitle('a/b'), isNotNull);
+      expect(NoteStorage.validateTitle('¿Qué?'), isNotNull); // el ? está prohibido
+      expect(NoteStorage.validateTitle('x' * 121), isNotNull);
+
+      await expectLater(
+        () => storage.saveNote(newNote(title: 'a:b')),
+        throwsA(isA<NoteStorageException>()),
+      );
+      expect(files(), isEmpty);
+    });
   });
 
-  test('guardar no deja archivos temporales', () async {
-    await storage.saveNote(
-      Note(title: 'A', content: 'hola', modifiedAt: DateTime.now()),
-    );
-    final names = tempDir.listSync().map((e) => e.uri.pathSegments.last);
-    expect(names, ['A.txt']);
-  });
+  group('listar y borrar', () {
+    test('lista notas propias y .txt de afuera; ignora otros archivos; '
+        'la más reciente primero', () async {
+      final older = await storage.saveNote(newNote(title: 'Vieja', second: 1));
+      final newer = await storage.saveNote(newNote(second: 2)); // sin título
+      final foreign = File('${tempDir.path}/Compras.txt')
+        ..writeAsStringSync('leche');
+      File('${tempDir.path}/foto.png').writeAsStringSync('x');
 
-  test('título repetido recibe un número', () async {
-    final a = await storage.createNote('Nota');
-    final b = await storage.createNote('Nota');
-    final c = await storage.createNote('nota'); // mayúsculas distintas
+      await File('${tempDir.path}/${older.fileName}')
+          .setLastModified(DateTime(2026, 1, 1));
+      await File('${tempDir.path}/${newer.fileName}')
+          .setLastModified(DateTime(2026, 3, 1));
+      await foreign.setLastModified(DateTime(2026, 2, 1));
 
-    expect(a.title, 'Nota');
-    expect(b.title, 'Nota (2)');
-    expect(c.title, 'nota (3)');
-  });
+      final notes = await storage.listNotes();
+      expect(notes.map((n) => n.title), ['', 'Compras', 'Vieja']);
+      expect(notes[1].content, 'leche');
+      expect(notes[1].createdAt, DateTime(2026, 2, 1)); // sin fecha en el nombre
+    });
 
-  test('listar devuelve todas las notas y omite otros archivos', () async {
-    await storage.createNote('Uno');
-    await storage.createNote('Dos');
-    File('${tempDir.path}/foto.png').writeAsStringSync('x');
+    test('editar un .txt de afuera sin cambiar el título conserva su nombre',
+        () async {
+      File('${tempDir.path}/Compras.txt').writeAsStringSync('leche');
 
-    final notes = await storage.listNotes();
-    expect(notes.map((n) => n.title), containsAll(['Uno', 'Dos']));
-    expect(notes.length, 2);
-  });
+      final note = await storage.readNote('Compras.txt');
+      await storage.saveNote(note.copyWith(content: 'leche y pan'));
 
-  test('renombrar cambia el nombre del archivo y conserva el texto', () async {
-    await storage.saveNote(
-      Note(title: 'Viejo', content: 'texto', modifiedAt: DateTime.now()),
-    );
+      expect(files(), ['Compras.txt']);
+      expect((await storage.readNote('Compras.txt')).content, 'leche y pan');
+    });
 
-    final renamed = await storage.renameNote('Viejo', 'Nuevo');
+    test('borrar elimina el archivo', () async {
+      final saved = await storage.saveNote(newNote(title: 'Temporal'));
+      await storage.deleteNote(saved.fileName!);
 
-    expect(renamed.title, 'Nuevo');
-    expect(renamed.content, 'texto');
-    expect(File('${tempDir.path}/Viejo.txt').existsSync(), isFalse);
-    expect(File('${tempDir.path}/Nuevo.txt').existsSync(), isTrue);
-  });
-
-  test('no se puede renombrar a un título que ya existe', () async {
-    await storage.createNote('A');
-    await storage.createNote('B');
-
-    await expectLater(
-      () => storage.renameNote('A', 'B'),
-      throwsA(isA<NoteStorageException>()),
-    );
-  });
-
-  test('borrar elimina el archivo', () async {
-    await storage.createNote('Temporal');
-    await storage.deleteNote('Temporal');
-
-    expect(await storage.listNotes(), isEmpty);
-  });
-
-  test('títulos inválidos se rechazan con un mensaje claro', () async {
-    expect(NoteStorage.validateTitle('Hola'), isNull);
-    expect(NoteStorage.validateTitle('   '), isNotNull);
-    expect(NoteStorage.validateTitle('a/b'), isNotNull);
-    expect(NoteStorage.validateTitle('¿Qué?'), isNotNull); // el ? está prohibido
-    expect(NoteStorage.validateTitle('con'), isNotNull); // reservado en Windows
-    expect(NoteStorage.validateTitle('termina.'), isNotNull);
-
-    await expectLater(
-      () => storage.createNote('a:b'),
-      throwsA(isA<NoteStorageException>()),
-    );
+      expect(await storage.listNotes(), isEmpty);
+    });
   });
 }
