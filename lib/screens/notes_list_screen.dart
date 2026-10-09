@@ -6,6 +6,7 @@ import '../services/note_storage.dart';
 import '../utils/date_text.dart';
 import '../widgets/confirm_delete_dialog.dart';
 import 'note_editor_screen.dart';
+import 'settings_screen.dart';
 
 /// Pantalla principal: la lista de notas.
 /// - Toca una nota para abrirla.
@@ -63,6 +64,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
     await _load(); // al regresar, la lista refleja lo que se guardó o borró
   }
 
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => SettingsScreen(
+        settings: widget.settings,
+        notesFolder: widget.storage.folder,
+      ),
+    ));
+  }
+
   Future<void> _showNoteMenu(Note note, Offset position) async {
     final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
     final choice = await showMenu<String>(
@@ -102,6 +112,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
             tooltip: 'Actualizar lista',
             icon: const Icon(Icons.refresh),
             onPressed: _load,
+          ),
+          IconButton(
+            tooltip: 'Ajustes',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
           ),
         ],
       ),
