@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
@@ -28,7 +29,7 @@ class NotesListScreen extends StatefulWidget {
 
 class _NotesListScreenState extends State<NotesListScreen> {
   List<Note>? _notes; // null = cargando
-  String? _error;
+  Object? _loadError; // el texto se arma en build(), en el idioma actual
 
   @override
   void initState() {
@@ -42,14 +43,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
       if (!mounted) return;
       setState(() {
         _notes = notes;
-        _error = null;
+        _loadError = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = 'No se pudo abrir la carpeta de notas:\n'
-            '${widget.storage.folder.path}\n\n$e';
-      });
+      setState(() => _loadError = e);
     }
   }
 
@@ -81,40 +79,44 @@ class _NotesListScreenState extends State<NotesListScreen> {
         position & const Size(1, 1),
         Offset.zero & overlay.size,
       ),
-      items: const [
-        PopupMenuItem(value: 'delete', child: Text('Borrar')),
+      items: [
+        PopupMenuItem(value: 'delete', child: Text(context.l10n.delete)),
       ],
     );
     if (choice == 'delete') await _delete(note);
   }
 
   Future<void> _delete(Note note) async {
-    final confirmed = await confirmDeleteNote(context, note.displayTitle);
+    final confirmed =
+        await confirmDeleteNote(context, context.l10n.displayTitle(note));
     if (!confirmed || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     try {
       await widget.storage.deleteNote(note.fileName!);
-      messenger.showSnackBar(const SnackBar(content: Text('Nota borrada')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.noteDeleted)));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('No se pudo borrar: $e')));
+      messenger.showSnackBar(
+          SnackBar(content: Text(l10n.deleteError(l10n.errorText(e)))));
     }
     await _load();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Synced Notes'),
+        title: const Text('Synced Notes'), // el nombre no se traduce
         actions: [
           // Por si cambiaste archivos desde el explorador con la app abierta.
           IconButton(
-            tooltip: 'Actualizar lista',
+            tooltip: l10n.refreshList,
             icon: const Icon(Icons.refresh),
             onPressed: _load,
           ),
           IconButton(
-            tooltip: 'Ajustes',
+            tooltip: l10n.settingsTitle,
             icon: const Icon(Icons.settings_outlined),
             onPressed: _openSettings,
           ),
@@ -122,7 +124,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       ),
       body: _buildBody(context),
       floatingActionButton: FloatingActionButton(
-        tooltip: 'Nueva nota',
+        tooltip: l10n.newNote,
         onPressed: () => _open(Note.blank()),
         child: const Icon(Icons.add),
       ),
@@ -131,17 +133,22 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   Widget _buildBody(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
-    if (_error != null) {
+    if (_loadError != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                l10n.notesFolderError(
+                    widget.storage.folder.path, l10n.errorText(_loadError!)),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: const Text('Reintentar')),
+              FilledButton(onPressed: _load, child: Text(l10n.retry)),
             ],
           ),
         ),
@@ -156,7 +163,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
     if (notes.isEmpty) {
       return Center(
         child: Text(
-          'Aún no tienes notas.\nToca + para crear una.',
+          l10n.emptyNotes,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -177,7 +184,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
               _showNoteMenu(note, details.globalPosition),
           child: ListTile(
             title: Text(
-              note.displayTitle,
+              l10n.displayTitle(note),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: note.hasTitle
@@ -188,12 +195,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     ),
             ),
             subtitle: Text(
-              _preview(note),
+              _preview(note, l10n),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             trailing: Text(
-              shortDate(note.modifiedAt),
+              shortDate(note.modifiedAt, l10n),
               style: theme.textTheme.bodySmall,
             ),
             onTap: () => _open(note),
@@ -204,9 +211,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
   }
 
   /// Inicio del texto, en una sola línea.
-  String _preview(Note note) {
+  String _preview(Note note, AppLocalizations l10n) {
     final text = note.content.trim();
-    if (text.isEmpty) return 'Sin texto';
+    if (text.isEmpty) return l10n.noPreview;
     final start = text.length > 200 ? text.substring(0, 200) : text;
     return start.replaceAll(RegExp(r'\s*\n\s*'), ' · ');
   }

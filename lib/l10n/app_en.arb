@@ -1,0 +1,223 @@
+{
+  "@@locale": "en",
+  "languageName": "English",
+  "@languageName": {
+    "description": "Name of this language written in this same language. Shown in the language picker so everyone can recognize their own language."
+  },
+  "settingsTitle": "Settings",
+  "settingsSectionGeneral": "General",
+  "settingsSectionSaving": "Saving",
+  "settingsSectionNotesLocation": "Notes location",
+  "settingsSectionAbout": "About",
+  "languageTitle": "Language",
+  "languageSystem": "System language",
+  "@languageSystem": {
+    "description": "Option in the language picker: follow the language of the phone or PC."
+  },
+  "languageSystemWithCurrent": "System language ({language})",
+  "@languageSystemWithCurrent": {
+    "description": "Current choice shown in Settings when following the system language. {language} is the language actually in use, e.g. 'English'.",
+    "placeholders": {
+      "language": {
+        "type": "String",
+        "example": "English"
+      }
+    }
+  },
+  "autosaveTitle": "Autosave",
+  "autosaveDescription": "Automatically saves the note after you stop typing, when you leave it and when you close the app. The save button is always available.",
+  "notesLocationWindows": "Each note is a .txt file inside this folder.",
+  "notesLocationAndroid": "Notes are stored inside the app. For now they can't be seen from the phone's file manager.",
+  "openInExplorer": "Open in File Explorer",
+  "openFolderError": "Couldn't open the folder: {error}",
+  "@openFolderError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "version": "Version {version}",
+  "@version": {
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.0.0"
+      }
+    }
+  },
+  "versionLoading": "Version…",
+  "versionUnknown": "Unknown version",
+  "license": "License",
+  "licenseDescription": "GPL-3.0: free and open-source software.",
+  "sourceCode": "Source code",
+  "browserOpenError": "Couldn't open the browser. The address is {url}",
+  "@browserOpenError": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "thirdPartyLicenses": "Third-party licenses",
+  "thirdPartyLicensesDescription": "Open-source packages used by the app",
+  "untitled": "Untitled",
+  "@untitled": {
+    "description": "Shown instead of the title for notes without one."
+  },
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "save": "Save",
+  "discard": "Discard",
+  "refreshList": "Refresh list",
+  "newNote": "New note",
+  "@newNote": {
+    "description": "Tooltip of the + button."
+  },
+  "noteDeleted": "Note deleted",
+  "deleteError": "Couldn't delete: {error}",
+  "@deleteError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFolderError": "Couldn't open the notes folder:\n{path}\n\n{error}",
+  "@notesFolderError": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "retry": "Try again",
+  "emptyNotes": "You don't have any notes yet.\nTap + to create one.",
+  "noPreview": "No text",
+  "@noPreview": {
+    "description": "Preview shown in the list for a note with a title but no text."
+  },
+  "deleteNoteQuestion": "Delete note?",
+  "deleteNoteWarning": "\"{title}\" will be deleted from the notes folder. This can't be undone.",
+  "@deleteNoteWarning": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "statusSaving": "Saving…",
+  "statusSaveError": "Error saving",
+  "statusNewNote": "New note",
+  "@statusNewNote": {
+    "description": "Editor status: a new note that is still empty."
+  },
+  "statusUnsaved": "Not saved",
+  "statusSaved": "Saved",
+  "saveError": "Couldn't save: {error}",
+  "@saveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "emptyNoteNotSaved": "Write a title or some text to save the note.",
+  "noteSaved": "Note saved",
+  "unsavedChangesQuestion": "Save changes?",
+  "unsavedChangesMessage": "This note has unsaved changes.",
+  "saveFailedTitle": "Couldn't save",
+  "leaveWithoutSaving": "Leave without saving",
+  "stay": "Stay",
+  "saveTooltip": "Save (Ctrl+S)",
+  "moreOptions": "More options",
+  "deleteNote": "Delete note",
+  "titleHint": "Title",
+  "contentHint": "Write here…",
+  "errorTitleTooLong": "The title can't be longer than {max} characters.",
+  "@errorTitleTooLong": {
+    "placeholders": {
+      "max": {
+        "type": "int",
+        "example": "120"
+      }
+    }
+  },
+  "errorTitleForbiddenChars": "The title can't contain: / \\ : * ? \" < > |",
+  "errorTitleControlChars": "The title contains characters that aren't allowed.",
+  "errorNoteNotFound": "The note is no longer in the folder.",
+  "errorDuplicateName": "Another note already has that name.",
+  "dateYesterday": "Yesterday",
+  "@dateYesterday": {
+    "description": "Short date in the notes list for something modified yesterday."
+  },
+  "dateMonthsShort": "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec",
+  "@dateMonthsShort": {
+    "description": "The 12 short month names, January to December, separated by |. Used by dateDayMonth and dateDayMonthYear."
+  },
+  "dateDayMonth": "{month} {day}",
+  "@dateDayMonth": {
+    "description": "Short date in the notes list for this year, e.g. 'Oct 3'.",
+    "placeholders": {
+      "day": {
+        "type": "String",
+        "example": "3"
+      },
+      "month": {
+        "type": "String",
+        "example": "Oct"
+      }
+    }
+  },
+  "dateDayMonthYear": "{month} {day}, {year}",
+  "@dateDayMonthYear": {
+    "description": "Short date in the notes list for another year, e.g. 'Oct 3, 2025'.",
+    "placeholders": {
+      "day": {
+        "type": "String",
+        "example": "3"
+      },
+      "month": {
+        "type": "String",
+        "example": "Oct"
+      },
+      "year": {
+        "type": "String",
+        "example": "2025"
+      }
+    }
+  },
+  "timeOfDay": "{hour12}:{minute} {period}",
+  "@timeOfDay": {
+    "description": "Time in the notes list for something modified today. Use either the 12-hour clock (hour12 + period) or the 24-hour clock (hour24).",
+    "placeholders": {
+      "hour12": {
+        "type": "String",
+        "description": "Hour from 1 to 12, e.g. '8' (optional: a language may leave it out)"
+      },
+      "hour24": {
+        "type": "String",
+        "description": "Hour from 00 to 23, with two digits, e.g. '20' (optional: a language may leave it out)"
+      },
+      "minute": {
+        "type": "String",
+        "example": "59"
+      },
+      "period": {
+        "type": "String",
+        "description": "timeAm or timePm, e.g. 'PM' (optional: a language may leave it out)"
+      }
+    }
+  },
+  "timeAm": "AM",
+  "@timeAm": {
+    "description": "Morning mark for the 12-hour clock in timeOfDay (only if this language uses it)."
+  },
+  "timePm": "PM",
+  "@timePm": {
+    "description": "Afternoon mark for the 12-hour clock in timeOfDay (only if this language uses it)."
+  }
+}

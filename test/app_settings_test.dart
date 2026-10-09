@@ -20,4 +20,19 @@ void main() {
     final reopened = await AppSettings.load(); // como al reabrir la app
     expect(reopened.autosave, isFalse);
   });
+
+  test('por defecto se usa el idioma del sistema', () async {
+    final settings = await AppSettings.load();
+    expect(settings.languageCode, isNull);
+  });
+
+  test('el idioma elegido se recuerda, y se puede volver al del sistema',
+      () async {
+    final settings = await AppSettings.load();
+    await settings.setLanguageCode('es');
+    expect((await AppSettings.load()).languageCode, 'es');
+
+    await settings.setLanguageCode(null);
+    expect((await AppSettings.load()).languageCode, isNull);
+  });
 }

@@ -126,18 +126,30 @@ void main() {
       expect(renamed.content, 'x');
     });
 
-    test('títulos inválidos se rechazan con un mensaje claro', () async {
+    test('títulos inválidos se rechazan diciendo qué tienen de malo',
+        () async {
       expect(NoteStorage.validateTitle(''), isNull); // vacío está permitido
       expect(NoteStorage.validateTitle('Hola'), isNull);
-      expect(NoteStorage.validateTitle('a/b'), isNotNull);
-      expect(NoteStorage.validateTitle('¿Qué?'), isNotNull); // el ? está prohibido
-      expect(NoteStorage.validateTitle('x' * 121), isNotNull);
+      expect(NoteStorage.validateTitle('a/b'), NoteError.titleForbiddenChars);
+      expect(NoteStorage.validateTitle('¿Qué?'), // el ? está prohibido
+          NoteError.titleForbiddenChars);
+      expect(NoteStorage.validateTitle('x' * 121), NoteError.titleTooLong);
+      expect(NoteStorage.validateTitle('a\tb'), NoteError.titleControlChars);
 
       await expectLater(
         () => storage.saveNote(newNote(title: 'a:b')),
-        throwsA(isA<NoteStorageException>()),
+        throwsA(isA<NoteStorageException>().having(
+            (e) => e.error, 'error', NoteError.titleForbiddenChars)),
       );
       expect(files(), isEmpty);
+    });
+
+    test('leer una nota que ya no existe avisa con noteNotFound', () async {
+      await expectLater(
+        () => storage.readNote('2026-10-03_20-59-12 No existe.txt'),
+        throwsA(isA<NoteStorageException>()
+            .having((e) => e.error, 'error', NoteError.noteNotFound)),
+      );
     });
   });
 

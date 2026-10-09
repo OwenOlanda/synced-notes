@@ -1,0 +1,251 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for Spanish Castilian (`es`).
+class AppLocalizationsEs extends AppLocalizations {
+  AppLocalizationsEs([String locale = 'es']) : super(locale);
+
+  @override
+  String get languageName => 'Español';
+
+  @override
+  String get settingsTitle => 'Ajustes';
+
+  @override
+  String get settingsSectionGeneral => 'General';
+
+  @override
+  String get settingsSectionSaving => 'Guardado';
+
+  @override
+  String get settingsSectionNotesLocation => 'Ubicación de las notas';
+
+  @override
+  String get settingsSectionAbout => 'Acerca de';
+
+  @override
+  String get languageTitle => 'Idioma';
+
+  @override
+  String get languageSystem => 'Idioma del sistema';
+
+  @override
+  String languageSystemWithCurrent(String language) {
+    return 'Idioma del sistema ($language)';
+  }
+
+  @override
+  String get autosaveTitle => 'Autoguardado';
+
+  @override
+  String get autosaveDescription =>
+      'Guarda la nota automáticamente después de dejar de escribir, al salir y al cerrar la app. El botón de guardar siempre está disponible.';
+
+  @override
+  String get notesLocationWindows =>
+      'Cada nota es un archivo .txt dentro de esta carpeta.';
+
+  @override
+  String get notesLocationAndroid =>
+      'Las notas se guardan dentro de la app. Por ahora no se ven desde el administrador de archivos del teléfono.';
+
+  @override
+  String get openInExplorer => 'Abrir en el explorador';
+
+  @override
+  String openFolderError(String error) {
+    return 'No se pudo abrir la carpeta: $error';
+  }
+
+  @override
+  String version(String version) {
+    return 'Versión $version';
+  }
+
+  @override
+  String get versionLoading => 'Versión…';
+
+  @override
+  String get versionUnknown => 'Versión desconocida';
+
+  @override
+  String get license => 'Licencia';
+
+  @override
+  String get licenseDescription =>
+      'GPL-3.0: software libre y de código abierto.';
+
+  @override
+  String get sourceCode => 'Código fuente';
+
+  @override
+  String browserOpenError(String url) {
+    return 'No se pudo abrir el navegador. La dirección es $url';
+  }
+
+  @override
+  String get thirdPartyLicenses => 'Licencias de terceros';
+
+  @override
+  String get thirdPartyLicensesDescription =>
+      'Paquetes de código abierto que usa la app';
+
+  @override
+  String get untitled => 'Sin título';
+
+  @override
+  String get cancel => 'Cancelar';
+
+  @override
+  String get delete => 'Borrar';
+
+  @override
+  String get save => 'Guardar';
+
+  @override
+  String get discard => 'Descartar';
+
+  @override
+  String get refreshList => 'Actualizar lista';
+
+  @override
+  String get newNote => 'Nueva nota';
+
+  @override
+  String get noteDeleted => 'Nota borrada';
+
+  @override
+  String deleteError(String error) {
+    return 'No se pudo borrar: $error';
+  }
+
+  @override
+  String notesFolderError(String path, String error) {
+    return 'No se pudo abrir la carpeta de notas:\n$path\n\n$error';
+  }
+
+  @override
+  String get retry => 'Reintentar';
+
+  @override
+  String get emptyNotes => 'Aún no tienes notas.\nToca + para crear una.';
+
+  @override
+  String get noPreview => 'Sin texto';
+
+  @override
+  String get deleteNoteQuestion => '¿Borrar nota?';
+
+  @override
+  String deleteNoteWarning(String title) {
+    return '\"$title\" se borrará de la carpeta de notas. Esto no se puede deshacer.';
+  }
+
+  @override
+  String get statusSaving => 'Guardando…';
+
+  @override
+  String get statusSaveError => 'Error al guardar';
+
+  @override
+  String get statusNewNote => 'Nota nueva';
+
+  @override
+  String get statusUnsaved => 'Sin guardar';
+
+  @override
+  String get statusSaved => 'Guardado';
+
+  @override
+  String saveError(String error) {
+    return 'No se pudo guardar: $error';
+  }
+
+  @override
+  String get emptyNoteNotSaved =>
+      'Escribe un título o un texto para guardar la nota.';
+
+  @override
+  String get noteSaved => 'Nota guardada';
+
+  @override
+  String get unsavedChangesQuestion => '¿Guardar los cambios?';
+
+  @override
+  String get unsavedChangesMessage => 'Esta nota tiene cambios sin guardar.';
+
+  @override
+  String get saveFailedTitle => 'No se pudo guardar';
+
+  @override
+  String get leaveWithoutSaving => 'Salir sin guardar';
+
+  @override
+  String get stay => 'Quedarme';
+
+  @override
+  String get saveTooltip => 'Guardar (Ctrl+S)';
+
+  @override
+  String get moreOptions => 'Más opciones';
+
+  @override
+  String get deleteNote => 'Borrar nota';
+
+  @override
+  String get titleHint => 'Título';
+
+  @override
+  String get contentHint => 'Escribe aquí…';
+
+  @override
+  String errorTitleTooLong(int max) {
+    return 'El título no puede tener más de $max caracteres.';
+  }
+
+  @override
+  String get errorTitleForbiddenChars =>
+      'El título no puede contener: / \\ : * ? \" < > |';
+
+  @override
+  String get errorTitleControlChars =>
+      'El título contiene caracteres no permitidos.';
+
+  @override
+  String get errorNoteNotFound => 'La nota ya no existe en la carpeta.';
+
+  @override
+  String get errorDuplicateName => 'Ya existe otra nota con ese nombre.';
+
+  @override
+  String get dateYesterday => 'Ayer';
+
+  @override
+  String get dateMonthsShort =>
+      'ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic';
+
+  @override
+  String dateDayMonth(String day, String month) {
+    return '$day $month';
+  }
+
+  @override
+  String dateDayMonthYear(String day, String month, String year) {
+    return '$day $month $year';
+  }
+
+  @override
+  String timeOfDay(String hour12, String hour24, String minute, String period) {
+    return '$hour24:$minute';
+  }
+
+  @override
+  String get timeAm => 'a. m.';
+
+  @override
+  String get timePm => 'p. m.';
+}

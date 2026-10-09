@@ -1,0 +1,9 @@
+# Configuración de las traducciones (gen_l10n de Flutter).
+# Los textos viven en lib/l10n/app_<idioma>.arb. El inglés es la plantilla:
+# toda clave nueva se agrega primero en app_en.arb y luego en los demás.
+# Para agregar un idioma: crear app_<código>.arb con todas las claves.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-dir: lib/l10n/generated
+output-localization-file: app_localizations.dart
+nullable-getter: false

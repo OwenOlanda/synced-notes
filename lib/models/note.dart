@@ -9,8 +9,10 @@
 /// - Lo que sigue es el título que escribió el usuario (puede estar vacío).
 /// - El contenido es el texto del archivo.
 ///
-/// Esta clase no sabe nada de archivos. Solo guarda los datos.
-/// El que lee y escribe en disco es NoteStorage.
+/// Esta clase no sabe nada de archivos ni de idiomas. Solo guarda los datos.
+/// El que lee y escribe en disco es NoteStorage. El título que se muestra
+/// para una nota sin título ("Sin título"/"Untitled") lo da
+/// `AppLocalizations.displayTitle` (lib/l10n/l10n.dart).
 class Note {
   const Note({
     this.fileName,
@@ -50,9 +52,6 @@ class Note {
 
   /// ¿El usuario le puso título?
   bool get hasTitle => title.trim().isNotEmpty;
-
-  /// Título para mostrar en pantalla.
-  String get displayTitle => hasTitle ? title : 'Sin título';
 
   /// ¿No tiene ni título ni texto? Las notas nuevas en blanco no se guardan.
   bool get isBlank => title.trim().isEmpty && content.trim().isEmpty;

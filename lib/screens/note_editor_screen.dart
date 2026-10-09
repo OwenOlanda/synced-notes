@@ -4,12 +4,28 @@ import 'dart:ui' show AppExitResponse;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/l10n.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
 import '../widgets/confirm_delete_dialog.dart';
 
 enum _LeaveChoice { save, discard, cancel }
+
+/// Un error del editor. Se guarda qué pasó (y el detalle técnico), no el
+/// texto: el mensaje se arma al mostrarlo, en el idioma actual.
+class _EditorError {
+  const _EditorError.save(this.detail) : _isSave = true;
+  const _EditorError.delete(this.detail) : _isSave = false;
+
+  final bool _isSave;
+  final Object detail;
+
+  String message(AppLocalizations l10n) {
+    final text = l10n.errorText(detail);
+    return _isSave ? l10n.saveError(text) : l10n.deleteError(text);
+  }
+}
 
 /// Editor de una nota: título opcional arriba y el texto debajo.
 ///
@@ -50,7 +66,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _saving = false;
   bool _leaving = false;
   bool _deleted = false;
-  String? _error;
+  _EditorError? _error;
 
   @override
   void initState() {
@@ -91,12 +107,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   bool get _hasUnsavedChanges => _isDirty && !_isEmptyNew;
 
-  String get _status {
-    if (_saving) return 'Guardando…';
-    if (_error != null) return 'Error al guardar';
-    if (_isEmptyNew) return 'Nota nueva';
-    if (_hasUnsavedChanges) return 'Sin guardar';
-    return 'Guardado';
+  String _status(AppLocalizations l10n) {
+    if (_saving) return l10n.statusSaving;
+    if (_error != null) return l10n.statusSaveError;
+    if (_isEmptyNew) return l10n.statusNewNote;
+    if (_hasUnsavedChanges) return l10n.statusUnsaved;
+    return l10n.statusSaved;
   }
 
   void _onChanged() {
@@ -128,7 +144,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _note = await widget.storage.saveNote(draft);
       _error = null;
     } catch (e) {
-      _error = 'No se pudo guardar: $e';
+      _error = _EditorError.save(e);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -140,20 +156,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   Future<void> _manualSave() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     if (_isEmptyNew) {
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(
-            content: Text('Escribe un título o un texto para guardar la nota.')));
+        ..showSnackBar(SnackBar(content: Text(l10n.emptyNoteNotSaved)));
       return;
     }
     await _save();
     if (_error == null) {
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(
-          content: Text('Nota guardada'),
-          duration: Duration(seconds: 1),
+        ..showSnackBar(SnackBar(
+          content: Text(l10n.noteSaved),
+          duration: const Duration(seconds: 1),
         ));
     }
   }
@@ -170,24 +186,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Future<_LeaveChoice> _askAboutUnsaved() async {
     final choice = await showDialog<_LeaveChoice>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Guardar los cambios?'),
-        content: const Text('Esta nota tiene cambios sin guardar.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, _LeaveChoice.cancel),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, _LeaveChoice.discard),
-            child: const Text('Descartar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, _LeaveChoice.save),
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final l10n = context.l10n;
+        return AlertDialog(
+          title: Text(l10n.unsavedChangesQuestion),
+          content: Text(l10n.unsavedChangesMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, _LeaveChoice.cancel),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, _LeaveChoice.discard),
+              child: Text(l10n.discard),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, _LeaveChoice.save),
+              child: Text(l10n.save),
+            ),
+          ],
+        );
+      },
     );
     return choice ?? _LeaveChoice.cancel;
   }
@@ -214,20 +233,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // No se pudo guardar: no salir sin avisar.
     final leaveAnyway = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('No se pudo guardar'),
-        content: Text(_error!),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Salir sin guardar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Quedarme'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final l10n = context.l10n;
+        return AlertDialog(
+          title: Text(l10n.saveFailedTitle),
+          content: Text(_error!.message(l10n)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l10n.leaveWithoutSaving),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.stay),
+            ),
+          ],
+        );
+      },
     );
     return leaveAnyway ?? false;
   }
@@ -250,7 +272,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _delete() async {
-    final confirmed = await confirmDeleteNote(context, _note.displayTitle);
+    final confirmed =
+        await confirmDeleteNote(context, context.l10n.displayTitle(_note));
     if (!confirmed) return;
     _autosaveTimer?.cancel();
     await _saveQueue; // esperar a que termine cualquier guardado en curso
@@ -259,7 +282,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _deleted = true;
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      if (mounted) setState(() => _error = 'No se pudo borrar: $e');
+      if (mounted) setState(() => _error = _EditorError.delete(e));
     }
   }
 
@@ -271,6 +294,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final l10n = context.l10n;
 
     return PopScope(
       canPop: false, // la salida pasa siempre por _leave()
@@ -285,19 +309,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         child: Scaffold(
           appBar: AppBar(
             title: Text(
-              _status,
+              _status(l10n),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: _error != null ? colors.error : colors.onSurfaceVariant,
               ),
             ),
             actions: [
               IconButton(
-                tooltip: 'Guardar (Ctrl+S)',
+                tooltip: l10n.saveTooltip,
                 icon: const Icon(Icons.save_outlined),
                 onPressed: _manualSave,
               ),
               PopupMenuButton<String>(
-                tooltip: 'Más opciones',
+                tooltip: l10n.moreOptions,
                 onSelected: (value) {
                   if (value == 'autosave') _toggleAutosave();
                   if (value == 'delete') _delete();
@@ -306,12 +330,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   CheckedPopupMenuItem(
                     value: 'autosave',
                     checked: widget.settings.autosave,
-                    child: const Text('Autoguardado'),
+                    child: Text(l10n.autosaveTitle),
                   ),
                   if (_note.isSaved)
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
-                      child: Text('Borrar nota'),
+                      child: Text(l10n.deleteNote),
                     ),
                 ],
               ),
@@ -326,14 +350,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(_error!, style: TextStyle(color: colors.error)),
+                      child: Text(_error!.message(l10n),
+                          style: TextStyle(color: colors.error)),
                     ),
                   TextField(
                     controller: _title,
                     autofocus: !_note.isSaved, // nota nueva: empieza en el título
                     style: theme.textTheme.headlineSmall,
-                    decoration: const InputDecoration(
-                      hintText: 'Título',
+                    decoration: InputDecoration(
+                      hintText: l10n.titleHint,
                       border: InputBorder.none,
                       counterText: '', // oculta el contador de caracteres
                     ),
@@ -355,8 +380,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       keyboardType: TextInputType.multiline,
                       textAlignVertical: TextAlignVertical.top,
                       style: theme.textTheme.bodyLarge,
-                      decoration: const InputDecoration(
-                        hintText: 'Escribe aquí…',
+                      decoration: InputDecoration(
+                        hintText: l10n.contentHint,
                         border: InputBorder.none,
                       ),
                     ),

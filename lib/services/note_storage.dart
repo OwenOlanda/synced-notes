@@ -2,13 +2,36 @@ import 'dart:io';
 
 import '../models/note.dart';
 
-/// Error con un mensaje que se le puede mostrar al usuario tal cual.
+/// Qué salió mal al leer o guardar una nota.
+///
+/// NoteStorage no escribe mensajes: solo dice qué pasó. La pantalla lo
+/// traduce al idioma de la app (ver `AppLocalizations.noteError`). Así este
+/// código no depende del idioma, y otras partes (ej. la sincronización)
+/// pueden reaccionar a cada caso sin comparar textos.
+enum NoteError {
+  /// El título pasa de [NoteStorage.maxTitleLength] caracteres.
+  titleTooLong,
+
+  /// El título tiene alguno de / \ : * ? " < > |
+  titleForbiddenChars,
+
+  /// El título tiene caracteres de control (ej. un salto de línea).
+  titleControlChars,
+
+  /// El archivo de la nota ya no está en la carpeta.
+  noteNotFound,
+
+  /// Ya hay otra nota con el mismo nombre de archivo.
+  duplicateName,
+}
+
+/// Error de NoteStorage. [error] dice qué pasó.
 class NoteStorageException implements Exception {
-  NoteStorageException(this.message);
-  final String message;
+  NoteStorageException(this.error);
+  final NoteError error;
 
   @override
-  String toString() => message;
+  String toString() => 'NoteStorageException(${error.name})';
 }
 
 /// Lee y escribe las notas como archivos .txt dentro de una carpeta.
@@ -49,18 +72,16 @@ class NoteStorage {
   // Títulos y nombres de archivo
   // ---------------------------------------------------------------------------
 
-  /// Devuelve `null` si el título es válido, o un mensaje explicando por qué no.
+  /// Devuelve `null` si el título es válido, o qué tiene de malo.
   /// Un título vacío es válido (la nota queda "Sin título").
-  static String? validateTitle(String title) {
+  static NoteError? validateTitle(String title) {
     final trimmed = title.trim();
-    if (trimmed.length > maxTitleLength) {
-      return 'El título no puede tener más de $maxTitleLength caracteres.';
-    }
+    if (trimmed.length > maxTitleLength) return NoteError.titleTooLong;
     if (forbiddenTitleChars.hasMatch(trimmed)) {
-      return r'El título no puede contener: / \ : * ? " < > |';
+      return NoteError.titleForbiddenChars;
     }
     if (trimmed.codeUnits.any((c) => c < 32)) {
-      return 'El título contiene caracteres no permitidos.';
+      return NoteError.titleControlChars;
     }
     return null;
   }
@@ -115,7 +136,7 @@ class NoteStorage {
   Future<Note> readNote(String fileName) async {
     final file = _file(fileName);
     if (!await file.exists()) {
-      throw NoteStorageException('La nota ya no existe en la carpeta.');
+      throw NoteStorageException(NoteError.noteNotFound);
     }
     return _readFile(file);
   }
@@ -154,7 +175,7 @@ class NoteStorage {
         target = _file(fileNameFor(title, current.createdAt ?? note.createdAt));
         if (await target.exists() &&
             !await FileSystemEntity.identical(oldFile.path, target.path)) {
-          throw NoteStorageException('Ya existe otra nota con ese nombre.');
+          throw NoteStorageException(NoteError.duplicateName);
         }
         if (await oldFile.exists()) {
           await oldFile.rename(target.path);
