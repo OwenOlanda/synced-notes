@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:synced_notes/models/collection.dart';
+import 'package:synced_notes/models/note_group.dart';
 import 'package:synced_notes/models/note.dart';
 import 'package:synced_notes/screens/note_editor_screen.dart';
 import 'package:synced_notes/services/app_settings.dart';
@@ -24,8 +24,8 @@ void main() {
     await tester.pumpWidget(localizedApp(
       NoteEditorScreen(
         note: Note.blank(),
-        storage: FakeStorage(collections: const [
-          Collection(name: 'Recetas', color: CollectionColor.orange),
+        storage: FakeStorage(groups: const [
+          NoteGroup(name: 'Recetas', color: GroupColor.orange),
         ]),
         settings: settings,
       ),

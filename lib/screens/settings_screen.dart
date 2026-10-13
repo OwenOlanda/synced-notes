@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/l10n.dart';
 import '../services/app_settings.dart';
+import '../widgets/app_message.dart';
 
 /// Pantalla de ajustes:
 /// - Idioma (el del sistema, o uno elegido a mano).
@@ -122,8 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // la carpeta, así que no se revisa su resultado.
       await Process.run('explorer.exe', [widget.notesFolder.path]);
     } catch (e) {
-      messenger.showSnackBar(
-          SnackBar(content: Text(l10n.openFolderError('$e'))));
+      messenger.showMessage(l10n.openFolderError('$e'), isError: true);
     }
   }
 
@@ -140,10 +140,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       opened = false;
     }
     if (!opened) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(
-            l10n.browserOpenError(SettingsScreen.repositoryUrl.toString())),
-      ));
+      messenger.showMessage(
+          l10n.browserOpenError(SettingsScreen.repositoryUrl.toString()),
+          isError: true);
     }
   }
 

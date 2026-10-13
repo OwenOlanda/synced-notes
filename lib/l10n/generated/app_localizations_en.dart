@@ -132,7 +132,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emptyNotes =>
-      'You don\'t have any notes yet.\nTap + to create one.';
+      'You don\'t have any notes yet.\nTap \"New note\" to create one.';
 
   @override
   String get noPreview => 'No text';
@@ -250,43 +250,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get timePm => 'PM';
 
   @override
-  String get errorCollectionNameEmpty => 'Write a name for the collection.';
+  String get errorGroupNameEmpty => 'Write a name for the group.';
 
   @override
-  String errorCollectionNameTooLong(int max) {
-    return 'The collection name can\'t be longer than $max characters.';
+  String errorGroupNameTooLong(int max) {
+    return 'The group name can\'t be longer than $max characters.';
   }
 
   @override
-  String get errorCollectionNameForbiddenChars =>
-      'The collection name can\'t contain: / \\ : * ? \" < > |';
+  String get errorGroupNameForbiddenChars =>
+      'The group name can\'t contain: / \\ : * ? \" < > |';
 
   @override
-  String get errorCollectionNameReserved =>
-      'That name can\'t be used for a collection: it\'s reserved by the system, or it starts or ends with a period.';
+  String get errorGroupNameReserved =>
+      'That name can\'t be used for a group: it\'s reserved by the system, or it starts or ends with a period.';
 
   @override
-  String get errorCollectionExists =>
-      'A collection with that name already exists.';
+  String get errorGroupExists => 'A group with that name already exists.';
 
   @override
-  String get errorCollectionNotFound => 'The collection no longer exists.';
+  String get errorGroupNotFound => 'The group no longer exists.';
 
   @override
   String get errorPermissionDenied =>
       'The app doesn\'t have permission to change this file or folder.';
 
   @override
-  String get collectionsAll => 'All';
+  String get groupsAll => 'All';
 
   @override
-  String get collectionsNone => 'No collection';
+  String get groupsNone => 'No group';
 
   @override
-  String get newCollection => 'New collection';
+  String get newGroup => 'New group';
 
   @override
-  String get collectionNameHint => 'Name';
+  String get groupNameHint => 'Name';
 
   @override
   String get create => 'Create';
@@ -295,24 +294,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rename => 'Rename';
 
   @override
-  String get renameCollection => 'Rename collection';
+  String get renameGroup => 'Rename group';
 
   @override
-  String get collectionColor => 'Color';
+  String get groupColor => 'Color';
 
   @override
   String get colorNone => 'No color';
 
   @override
-  String deleteCollectionQuestion(String name) {
-    return 'Delete the collection \"$name\"?';
+  String deleteGroupQuestion(String name) {
+    return 'Delete the group \"$name\"?';
   }
 
   @override
-  String get deleteEmptyCollectionMessage => 'The collection is empty.';
+  String get deleteEmptyGroupMessage => 'The group is empty.';
 
   @override
-  String deleteCollectionWithNotes(int count) {
+  String deleteGroupWithNotes(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
@@ -323,16 +322,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get moveNotesToNone => 'Move to \"No collection\"';
+  String get moveNotesToNone => 'Move to \"No group\"';
 
   @override
   String get deleteNotesToo => 'Delete the notes too';
 
   @override
-  String get collectionDeleted => 'Collection deleted';
+  String get groupDeleted => 'Group deleted';
 
   @override
-  String get emptyFilter => 'No notes here yet.\nTap + to create one.';
+  String get emptyFilter =>
+      'No notes here yet.\nTap \"New note\" to create one.';
 
   @override
   String get moveTo => 'Move to…';
@@ -341,7 +341,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get moveNoteTitle => 'Move note to';
 
   @override
-  String get newCollectionEllipsis => 'New collection…';
+  String get newGroupEllipsis => 'New group…';
 
   @override
   String noteMovedTo(String name) {
@@ -349,7 +349,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get noteMovedToNone => 'Note moved to \"No collection\"';
+  String get noteMovedToNone => 'Note moved to \"No group\"';
 
   @override
   String newNoteIn(String name) {
@@ -372,4 +372,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get themeDark => 'Dark';
+
+  @override
+  String notesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notes',
+      one: '1 note',
+      zero: 'No notes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get searchGroupsHint => 'Search groups';
+
+  @override
+  String get noGroupsFound => 'No groups with that name';
+
+  @override
+  String get groupOptions => 'Group options';
+
+  @override
+  String get noteGroupsTitle => 'Note groups';
+
+  @override
+  String get showAllGroups => 'Show all groups';
+
+  @override
+  String listSummary(String view, String notes) {
+    return '$view · $notes';
+  }
+
+  @override
+  String get closeNote => 'Close note';
+
+  @override
+  String get noNoteOpen => 'Pick a note from the list\nor create a new one.';
+
+  @override
+  String get newNoteInPrefix => 'New note in';
 }

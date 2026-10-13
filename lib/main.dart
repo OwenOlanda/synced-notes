@@ -6,6 +6,7 @@ import 'screens/notes_list_screen.dart';
 import 'services/app_settings.dart';
 import 'services/note_storage.dart';
 import 'services/notes_folder.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,6 @@ class SyncedNotesApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Colors.teal;
     // Se reconstruye cuando cambian los ajustes, para que un cambio de
     // idioma se vea al instante, sin reiniciar la app.
     return ListenableBuilder(
@@ -47,15 +47,9 @@ class SyncedNotesApp extends StatelessWidget {
         localeListResolutionCallback: resolveAppLocale,
         // Claro, oscuro o el del sistema (se elige en Ajustes).
         themeMode: settings.themeMode,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: seed),
-          useMaterial3: true,
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: seed, brightness: Brightness.dark),
-          useMaterial3: true,
-        ),
+        // Tema neutro (sin tinte de color): ver lib/theme/app_theme.dart.
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
         home: NotesListScreen(storage: storage, settings: settings),
       ),
     );

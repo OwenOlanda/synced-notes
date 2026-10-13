@@ -1,21 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../models/collection.dart';
+import '../models/note_group.dart';
 
 /// Datos extra de la app que no caben en las notas (.txt): por ahora, el
-/// color de cada colección. Más adelante: pins, orden, etc.
+/// color de cada grupo. Más adelante: pins, orden, etc.
 ///
 /// Viven dentro de la propia carpeta de notas, en una carpeta oculta:
-///   `Synced Notes/.synced-notes/collections.json`
+///   `Synced Notes/.synced-notes/groups.json`
 /// Así viajan con la sincronización: el color que se elige en la PC también
 /// aparece en el celular. La carpeta empieza con punto, y NoteStorage ignora
-/// esas carpetas al buscar colecciones.
+/// esas carpetas al buscar grupos.
 ///
 /// Formato (pensado para crecer sin romper versiones anteriores):
 ///   {
 ///     "version": 1,
-///     "collections": {
+///     "groups": {
 ///       "Recetas": { "color": "orange" }
 ///     }
 ///   }
@@ -27,24 +27,24 @@ class MetadataStore {
 
   /// Nombre de la carpeta oculta.
   static const String folderName = '.synced-notes';
-  static const String _collectionsFile = 'collections.json';
+  static const String _groupsFile = 'groups.json';
   static const int _version = 1;
 
   /// Carpeta oculta donde se guardan los datos.
   final Directory folder;
 
   File get _file =>
-      File('${folder.path}${Platform.pathSeparator}$_collectionsFile');
+      File('${folder.path}${Platform.pathSeparator}$_groupsFile');
 
-  /// Color de cada colección, por nombre. Solo incluye las que tienen color.
-  Future<Map<String, CollectionColor>> collectionColors() async {
+  /// Color de cada grupo, por nombre. Solo incluye los que tienen color.
+  Future<Map<String, GroupColor>> groupColors() async {
     final data = await _read();
-    final result = <String, CollectionColor>{};
-    final collections = data['collections'];
-    if (collections is Map) {
-      collections.forEach((name, value) {
+    final result = <String, GroupColor>{};
+    final groups = data['groups'];
+    if (groups is Map) {
+      groups.forEach((name, value) {
         if (value is Map) {
-          final color = CollectionColor.fromName(value['color'] as String?);
+          final color = GroupColor.fromName(value['color'] as String?);
           if (color != null) result['$name'] = color;
         }
       });
@@ -52,41 +52,41 @@ class MetadataStore {
     return result;
   }
 
-  /// Cambia el color de una colección (`null` = quitarle el color).
-  Future<void> setCollectionColor(String name, CollectionColor? color) {
-    return _update((collections) {
-      final entry = _entry(collections, name);
+  /// Cambia el color de un grupo (`null` = quitarle el color).
+  Future<void> setGroupColor(String name, GroupColor? color) {
+    return _update((groups) {
+      final entry = _entry(groups, name);
       if (color == null) {
         entry.remove('color');
       } else {
         entry['color'] = color.name;
       }
-      if (entry.isEmpty) collections.remove(name);
+      if (entry.isEmpty) groups.remove(name);
     });
   }
 
-  /// La colección cambió de nombre: sus datos la siguen.
-  Future<void> renameCollection(String oldName, String newName) {
-    return _update((collections) {
-      final entry = collections.remove(oldName);
-      if (entry != null) collections[newName] = entry;
+  /// El grupo cambió de nombre: sus datos lo siguen.
+  Future<void> renameGroup(String oldName, String newName) {
+    return _update((groups) {
+      final entry = groups.remove(oldName);
+      if (entry != null) groups[newName] = entry;
     });
   }
 
-  /// La colección se borró: se olvidan sus datos.
-  Future<void> removeCollection(String name) {
-    return _update((collections) => collections.remove(name));
+  /// El grupo se borró: se olvidan sus datos.
+  Future<void> removeGroup(String name) {
+    return _update((groups) => groups.remove(name));
   }
 
   // ---------------------------------------------------------------------------
   // Ayudantes internos
   // ---------------------------------------------------------------------------
 
-  Map<String, dynamic> _entry(Map<String, dynamic> collections, String name) {
-    final existing = collections[name];
+  Map<String, dynamic> _entry(Map<String, dynamic> groups, String name) {
+    final existing = groups[name];
     if (existing is Map<String, dynamic>) return existing;
     final created = <String, dynamic>{};
-    collections[name] = created;
+    groups[name] = created;
     return created;
   }
 
@@ -103,14 +103,14 @@ class MetadataStore {
   }
 
   Future<void> _update(
-      void Function(Map<String, dynamic> collections) change) async {
+      void Function(Map<String, dynamic> groups) change) async {
     final data = await _read();
-    final collections = data['collections'] is Map<String, dynamic>
-        ? data['collections'] as Map<String, dynamic>
+    final groups = data['groups'] is Map<String, dynamic>
+        ? data['groups'] as Map<String, dynamic>
         : <String, dynamic>{};
-    change(collections);
+    change(groups);
     data['version'] = _version;
-    data['collections'] = collections;
+    data['groups'] = groups;
 
     // Guardado seguro, igual que las notas: temporal y luego reemplazar.
     await folder.create(recursive: true);

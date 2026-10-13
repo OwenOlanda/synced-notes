@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>D3: franja abajo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#EDEDEF}a:hover{color:#FFFFFF}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #121214; color: #EDEDEF; font-family: 'Figtree', system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+
+<header style="display: flex; align-items: center; justify-content: flex-end; padding: 12px 12px 0 20px; gap: 4px">
+<button type="button" aria-label="Buscar" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EDEDEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+</button>
+<button type="button" aria-label="Ajustes" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EDEDEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"></path></svg>
+</button>
+</header>
+
+<ul style="list-style: none; margin: 0; padding: 4px 8px 0; display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden">
+<li style="padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-size: 17px; font-weight: 600; flex: 1">tabata</span><span style="font-size: 13px; color: #A0A0AB">18:44</span></div>
+<div style="display: flex; gap: 8px; font-size: 14px; color: #A0A0AB"><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">tempo 1 · tempo 2</span><span style="color: #F2C94C; font-weight: 500">Rutinas</span></div>
+</li>
+<li style="padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-size: 17px; font-weight: 600; flex: 1">Cardio</span><span style="font-size: 13px; color: #A0A0AB">18:44</span></div>
+<div style="display: flex; gap: 8px; font-size: 14px; color: #A0A0AB"><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">rutina 1</span><span style="color: #F2C94C; font-weight: 500">Rutinas</span></div>
+</li>
+<li style="padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-size: 17px; font-weight: 600; flex: 1">Receta Jugo Verde</span><span style="font-size: 13px; color: #A0A0AB">18:43</span></div>
+<div style="display: flex; gap: 8px; font-size: 14px; color: #A0A0AB"><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">ingredientes · lista</span><span style="color: #9AA5F2; font-weight: 500">Recetas</span></div>
+</li>
+<li style="padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-size: 17px; font-weight: 600; flex: 1">Frase Nueva</span><span style="font-size: 13px; color: #A0A0AB">9 oct</span></div>
+<div style="display: flex; gap: 8px; font-size: 14px; color: #A0A0AB"><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Ashes</span><span style="color: #F06292; font-weight: 500">Frases</span></div>
+</li>
+<li style="padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-size: 17px; font-weight: 600; flex: 1">YourEyes</span><span style="font-size: 13px; color: #A0A0AB">9 oct</span></div>
+<div style="font-size: 14px; color: #A0A0AB">SixEyes</div>
+</li>
+<li style="padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-size: 17px; font-weight: 600; flex: 1">continuación</span><span style="font-size: 13px; color: #A0A0AB">9 oct</span></div>
+<div style="font-size: 14px; color: #A0A0AB; font-style: italic">Sin texto</div>
+</li>
+<li style="padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-size: 17px; font-weight: 600; flex: 1; font-style: italic; color: #A0A0AB">Sin título</span><span style="font-size: 13px; color: #A0A0AB">8 oct</span></div>
+<div style="font-size: 14px; color: #A0A0AB">Lista para el fin de semana</div>
+</li>
+</ul>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column">
+<div style="padding: 32px 0 14px; background: linear-gradient(to bottom, rgba(18,18,20,0), #121214 60%); display: flex; justify-content: center">
+<button type="button" style="height: 60px; padding: 0 28px; border-radius: 30px; border: none; background: #EDEDEF; color: #121214; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 10px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.45)">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#121214" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M12 11v6M9 14h6"></path></svg>
+Nueva nota
+</button>
+</div>
+<button type="button" aria-label="Elegir colección" style="width: 100%; box-sizing: border-box; padding: 14px 20px 26px; border: none; border-top: 1px solid #2C2C32; background: #1C1C20; color: #EDEDEF; display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left">
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 22px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Todas</span>
+<span style="font-size: 13px; color: #A0A0AB">7 notas · toca para cambiar de colección</span>
+</span>
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A0A0AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

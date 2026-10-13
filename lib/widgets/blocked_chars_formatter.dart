@@ -8,7 +8,7 @@ import 'package:flutter/widgets.dart';
 /// la pantalla muestre un mensaje. Así el usuario entiende por qué no se
 /// escribió lo que tecleó.
 ///
-/// Lo usan el título de la nota y el nombre de una colección, para que
+/// Lo usan el título de la nota y el nombre de un grupo, para que
 /// ambos se comporten igual.
 class BlockedCharsFormatter extends TextInputFormatter {
   BlockedCharsFormatter(RegExp blocked, {required this.onBlocked})

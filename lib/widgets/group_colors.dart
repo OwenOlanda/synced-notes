@@ -1,31 +1,31 @@
 import 'package:flutter/material.dart';
 
-import '../models/collection.dart';
+import '../models/note_group.dart';
 
-/// Color en pantalla de un [CollectionColor]: un tono más oscuro en el tema
+/// Color en pantalla de un [GroupColor]: un tono más oscuro en el tema
 /// claro y uno más claro en el oscuro, para que se lea bien en ambos.
-Color displayColor(CollectionColor color, Brightness brightness) {
+Color displayColor(GroupColor color, Brightness brightness) {
   final MaterialColor base = switch (color) {
-    CollectionColor.red => Colors.red,
-    CollectionColor.orange => Colors.orange,
-    CollectionColor.amber => Colors.amber,
-    CollectionColor.green => Colors.green,
-    CollectionColor.teal => Colors.teal,
-    CollectionColor.blue => Colors.blue,
-    CollectionColor.indigo => Colors.indigo,
-    CollectionColor.purple => Colors.purple,
-    CollectionColor.pink => Colors.pink,
-    CollectionColor.brown => Colors.brown,
-    CollectionColor.grey => Colors.blueGrey,
+    GroupColor.red => Colors.red,
+    GroupColor.orange => Colors.orange,
+    GroupColor.amber => Colors.amber,
+    GroupColor.green => Colors.green,
+    GroupColor.teal => Colors.teal,
+    GroupColor.blue => Colors.blue,
+    GroupColor.indigo => Colors.indigo,
+    GroupColor.purple => Colors.purple,
+    GroupColor.pink => Colors.pink,
+    GroupColor.brown => Colors.brown,
+    GroupColor.grey => Colors.blueGrey,
   };
   return brightness == Brightness.dark ? base.shade300 : base.shade600;
 }
 
-/// Puntito de color de una colección. Sin color: un círculo vacío.
-class CollectionDot extends StatelessWidget {
-  const CollectionDot(this.color, {super.key, this.size = 12});
+/// Puntito de color de un grupo. Sin color: un círculo vacío.
+class GroupDot extends StatelessWidget {
+  const GroupDot(this.color, {super.key, this.size = 12});
 
-  final CollectionColor? color;
+  final GroupColor? color;
   final double size;
 
   @override
@@ -47,16 +47,16 @@ class CollectionDot extends StatelessWidget {
 }
 
 /// Fila de círculos para elegir un color (o "sin color").
-class CollectionColorPicker extends StatelessWidget {
-  const CollectionColorPicker({
+class GroupColorPicker extends StatelessWidget {
+  const GroupColorPicker({
     super.key,
     required this.selected,
     required this.onChanged,
     required this.noColorLabel,
   });
 
-  final CollectionColor? selected;
-  final ValueChanged<CollectionColor?> onChanged;
+  final GroupColor? selected;
+  final ValueChanged<GroupColor?> onChanged;
 
   /// Texto (tooltip) de la opción "sin color".
   final String noColorLabel;
@@ -65,7 +65,7 @@ class CollectionColorPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    Widget option(CollectionColor? color, {String? tooltip}) {
+    Widget option(GroupColor? color, {String? tooltip}) {
       final isSelected = color == selected;
       final fill = color == null ? null : displayColor(color, theme.brightness);
       final circle = InkWell(
@@ -109,19 +109,19 @@ class CollectionColorPicker extends StatelessWidget {
       runSpacing: 8,
       children: [
         option(null, tooltip: noColorLabel),
-        for (final color in CollectionColor.values) option(color),
+        for (final color in GroupColor.values) option(color),
       ],
     );
   }
 }
 
-/// Etiqueta pequeña con el nombre de una colección, en su color.
+/// Etiqueta pequeña con el nombre de un grupo, en su color.
 /// Se muestra en cada nota cuando se están viendo "Todas".
-class CollectionTag extends StatelessWidget {
-  const CollectionTag({super.key, required this.name, this.color});
+class GroupTag extends StatelessWidget {
+  const GroupTag({super.key, required this.name, this.color});
 
   final String name;
-  final CollectionColor? color;
+  final GroupColor? color;
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +140,7 @@ class CollectionTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CollectionDot(c, size: 8),
+          GroupDot(c, size: 8),
           const SizedBox(width: 4),
           Flexible(
             child: Text(

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:synced_notes/models/collection_filter.dart';
+import 'package:synced_notes/models/group_filter.dart';
 import 'package:synced_notes/services/app_settings.dart';
 
 void main() {
   setUp(() {
-    // Preferencias vacías en memoria (no toca las reales de tu PC).
+    // Preferencias vacíos en memoria (no toca las reales de tu PC).
     SharedPreferences.setMockInitialValues({});
   });
 
@@ -40,34 +40,34 @@ void main() {
 
   test('por defecto se ven todas las notas', () async {
     final settings = await AppSettings.load();
-    expect(settings.selectedCollection, CollectionFilter.all);
+    expect(settings.selectedGroup, GroupFilter.all);
   });
 
-  test('la colección que se estaba viendo se recuerda', () async {
+  test('el grupo que se estaba viendo se recuerda', () async {
     final settings = await AppSettings.load();
     await settings
-        .setSelectedCollection(const CollectionFilter.collection('Recetas'));
-    expect((await AppSettings.load()).selectedCollection,
-        const CollectionFilter.collection('Recetas'));
+        .setSelectedGroup(const GroupFilter.group('Recetas'));
+    expect((await AppSettings.load()).selectedGroup,
+        const GroupFilter.group('Recetas'));
 
-    await settings.setSelectedCollection(CollectionFilter.none);
-    expect((await AppSettings.load()).selectedCollection,
-        CollectionFilter.none);
+    await settings.setSelectedGroup(GroupFilter.none);
+    expect((await AppSettings.load()).selectedGroup,
+        GroupFilter.none);
   });
 
-  test('CollectionFilter se guarda y se lee igual (incluso con ":" o "c:")',
+  test('GroupFilter se guarda y se lee igual (incluso con ":" o "g:")',
       () {
     for (final filter in [
-      CollectionFilter.all,
-      CollectionFilter.none,
-      const CollectionFilter.collection('Recetas'),
-      const CollectionFilter.collection('c:rara'),
-      const CollectionFilter.collection('none'),
+      GroupFilter.all,
+      GroupFilter.none,
+      const GroupFilter.group('Recetas'),
+      const GroupFilter.group('g:rara'),
+      const GroupFilter.group('none'),
     ]) {
-      expect(CollectionFilter.decode(filter.encode()), filter);
+      expect(GroupFilter.decode(filter.encode()), filter);
     }
-    expect(CollectionFilter.decode(null), CollectionFilter.all);
-    expect(CollectionFilter.decode('basura'), CollectionFilter.all);
+    expect(GroupFilter.decode(null), GroupFilter.all);
+    expect(GroupFilter.decode('basura'), GroupFilter.all);
   });
 
   test('el tema: del sistema por defecto, y se recuerda el elegido', () async {

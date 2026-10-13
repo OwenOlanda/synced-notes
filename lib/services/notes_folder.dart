@@ -7,8 +7,8 @@ import 'package:path_provider/path_provider.dart';
 /// - Windows: `Documentos\Synced Notes` (visible desde el explorador).
 /// - Android: la carpeta interna de la app (`.../app_flutter/notes`).
 ///
-/// Las colecciones serán subcarpetas dentro de esta carpeta; las notas sin
-/// colección quedan sueltas en ella.
+/// Los grupos serán subcarpetas dentro de esta carpeta; las notas sin
+/// grupo quedan sueltas en ella.
 class NotesFolder {
   NotesFolder({
     Future<Directory> Function()? documentsDir,

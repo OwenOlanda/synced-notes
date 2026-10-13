@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
-import '../models/collection.dart';
+import '../models/note_group.dart';
 import '../services/note_storage.dart';
 import 'blocked_chars_formatter.dart';
-import 'collection_colors.dart';
+import 'group_colors.dart';
 
-/// Diálogo para escribir el nombre de una colección (crear o renombrar).
+/// Diálogo para escribir el nombre de un grupo (crear o renombrar).
 ///
 /// - Avisa al momento si el nombre tiene algo no permitido (ej. "/").
 /// - [onSubmit] hace el trabajo (crear o renombrar). Si falla (ej. ya existe
-///   una colección con ese nombre), el error se muestra en el mismo diálogo y
+///   un grupo con ese nombre), el error se muestra en el mismo diálogo y
 ///   se puede corregir sin volver a empezar.
 /// - [showColor]: muestra también el selector de color (al crear).
 /// Devuelve `true` si se completó; `false` si se canceló.
-Future<bool> showCollectionNameDialog(
+Future<bool> showGroupNameDialog(
   BuildContext context, {
   required String title,
   required String confirmLabel,
   String initialName = '',
   bool showColor = false,
-  required Future<void> Function(String name, CollectionColor? color) onSubmit,
+  required Future<void> Function(String name, GroupColor? color) onSubmit,
 }) async {
   final result = await showDialog<bool>(
     context: context,
-    builder: (context) => _CollectionNameDialog(
+    builder: (context) => _GroupNameDialog(
       title: title,
       confirmLabel: confirmLabel,
       initialName: initialName,
@@ -35,8 +35,8 @@ Future<bool> showCollectionNameDialog(
   return result ?? false;
 }
 
-class _CollectionNameDialog extends StatefulWidget {
-  const _CollectionNameDialog({
+class _GroupNameDialog extends StatefulWidget {
+  const _GroupNameDialog({
     required this.title,
     required this.confirmLabel,
     required this.initialName,
@@ -48,18 +48,18 @@ class _CollectionNameDialog extends StatefulWidget {
   final String confirmLabel;
   final String initialName;
   final bool showColor;
-  final Future<void> Function(String name, CollectionColor? color) onSubmit;
+  final Future<void> Function(String name, GroupColor? color) onSubmit;
 
   @override
-  State<_CollectionNameDialog> createState() => _CollectionNameDialogState();
+  State<_GroupNameDialog> createState() => _GroupNameDialogState();
 }
 
-class _CollectionNameDialogState extends State<_CollectionNameDialog> {
+class _GroupNameDialogState extends State<_GroupNameDialog> {
   late final TextEditingController _name =
       TextEditingController(text: widget.initialName)
         ..selection = TextSelection(
             baseOffset: 0, extentOffset: widget.initialName.length);
-  CollectionColor? _color;
+  GroupColor? _color;
   String? _error;
   bool _busy = false;
 
@@ -84,9 +84,9 @@ class _CollectionNameDialogState extends State<_CollectionNameDialog> {
   /// "Vacío" no se marca hasta que se intenta confirmar (no tiene caso
   /// regañar antes de escribir).
   void _onChanged(String value) {
-    final problem = NoteStorage.validateCollectionName(value);
+    final problem = NoteStorage.validateGroupName(value);
     setState(() {
-      _error = problem == null || problem == NoteError.collectionNameEmpty
+      _error = problem == null || problem == NoteError.groupNameEmpty
           ? null
           : context.l10n.noteError(problem);
     });
@@ -95,7 +95,7 @@ class _CollectionNameDialogState extends State<_CollectionNameDialog> {
   Future<void> _submit() async {
     if (_busy) return;
     final l10n = context.l10n;
-    final problem = NoteStorage.validateCollectionName(_name.text);
+    final problem = NoteStorage.validateGroupName(_name.text);
     if (problem != null) {
       setState(() => _error = l10n.noteError(problem));
       return;
@@ -129,9 +129,9 @@ class _CollectionNameDialogState extends State<_CollectionNameDialog> {
               autofocus: true,
               maxLength: NoteStorage.maxTitleLength,
               decoration: InputDecoration(
-                hintText: l10n.collectionNameHint,
+                hintText: l10n.groupNameHint,
                 errorText: _forbiddenHint.visible
-                    ? l10n.errorCollectionNameForbiddenChars
+                    ? l10n.errorGroupNameForbiddenChars
                     : _error,
                 errorMaxLines: 3,
                 counterText: '',
@@ -142,10 +142,10 @@ class _CollectionNameDialogState extends State<_CollectionNameDialog> {
             ),
             if (widget.showColor) ...[
               const SizedBox(height: 16),
-              Text(l10n.collectionColor,
+              Text(l10n.groupColor,
                   style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 8),
-              CollectionColorPicker(
+              GroupColorPicker(
                 selected: _color,
                 noColorLabel: l10n.colorNone,
                 onChanged: (color) => setState(() => _color = color),
@@ -173,23 +173,23 @@ class ColorChoice {
   const ColorChoice(this.color);
 
   /// `null` = sin color.
-  final CollectionColor? color;
+  final GroupColor? color;
 }
 
-/// Diálogo para elegir el color de una colección. Se cierra al tocar un
+/// Diálogo para elegir el color de un grupo. Se cierra al tocar un
 /// color. Devuelve `null` si se cerró sin elegir.
-Future<ColorChoice?> showCollectionColorDialog(
+Future<ColorChoice?> showGroupColorDialog(
   BuildContext context, {
-  required String collectionName,
-  required CollectionColor? current,
+  required String groupName,
+  required GroupColor? current,
 }) {
   return showDialog<ColorChoice>(
     context: context,
     builder: (context) {
       final l10n = context.l10n;
       return AlertDialog(
-        title: Text('${l10n.collectionColor}: $collectionName'),
-        content: CollectionColorPicker(
+        title: Text('${l10n.groupColor}: $groupName'),
+        content: GroupColorPicker(
           selected: current,
           noColorLabel: l10n.colorNone,
           onChanged: (color) => Navigator.of(context).pop(ColorChoice(color)),
@@ -205,33 +205,33 @@ Future<ColorChoice?> showCollectionColorDialog(
   );
 }
 
-/// Qué hacer con las notas al borrar una colección.
-enum DeleteCollectionChoice {
-  /// Pasarlas a "Sin colección".
+/// Qué hacer con las notas al borrar un grupo.
+enum DeleteGroupChoice {
+  /// Pasarlas a "Sin grupo".
   moveNotes,
 
   /// Borrarlas también.
   deleteNotes,
 }
 
-/// Pregunta antes de borrar una colección. Si tiene notas, pregunta qué
+/// Pregunta antes de borrar un grupo. Si tiene notas, pregunta qué
 /// hacer con ellas. Devuelve `null` si se canceló.
-Future<DeleteCollectionChoice?> showDeleteCollectionDialog(
+Future<DeleteGroupChoice?> showDeleteGroupDialog(
   BuildContext context, {
-  required String collectionName,
+  required String groupName,
   required int noteCount,
 }) {
-  return showDialog<DeleteCollectionChoice>(
+  return showDialog<DeleteGroupChoice>(
     context: context,
     builder: (context) {
       final l10n = context.l10n;
       final colors = Theme.of(context).colorScheme;
       final hasNotes = noteCount > 0;
       return AlertDialog(
-        title: Text(l10n.deleteCollectionQuestion(collectionName)),
+        title: Text(l10n.deleteGroupQuestion(groupName)),
         content: Text(hasNotes
-            ? l10n.deleteCollectionWithNotes(noteCount)
-            : l10n.deleteEmptyCollectionMessage),
+            ? l10n.deleteGroupWithNotes(noteCount)
+            : l10n.deleteEmptyGroupMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -241,12 +241,12 @@ Future<DeleteCollectionChoice?> showDeleteCollectionDialog(
             TextButton(
               style: TextButton.styleFrom(foregroundColor: colors.error),
               onPressed: () => Navigator.of(context)
-                  .pop(DeleteCollectionChoice.deleteNotes),
+                  .pop(DeleteGroupChoice.deleteNotes),
               child: Text(l10n.deleteNotesToo),
             ),
             FilledButton(
               onPressed: () =>
-                  Navigator.of(context).pop(DeleteCollectionChoice.moveNotes),
+                  Navigator.of(context).pop(DeleteGroupChoice.moveNotes),
               child: Text(l10n.moveNotesToNone),
             ),
           ] else
@@ -258,7 +258,7 @@ Future<DeleteCollectionChoice?> showDeleteCollectionDialog(
                 foregroundColor: colors.onError,
               ),
               onPressed: () =>
-                  Navigator.of(context).pop(DeleteCollectionChoice.moveNotes),
+                  Navigator.of(context).pop(DeleteGroupChoice.moveNotes),
               child: Text(l10n.delete),
             ),
         ],

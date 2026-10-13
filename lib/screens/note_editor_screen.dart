@@ -8,6 +8,7 @@ import '../l10n/l10n.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
+import '../widgets/app_message.dart';
 import '../widgets/blocked_chars_formatter.dart';
 import '../widgets/confirm_delete_dialog.dart';
 import '../widgets/move_note_dialog.dart';
@@ -37,23 +38,55 @@ class _EditorError {
 ///   escribir, al salir del editor y al minimizar o cerrar la app.
 /// - Con autoguardado desactivado: al salir con cambios pregunta qué hacer.
 /// - Una nota nueva sin título ni texto nunca se guarda.
+///
+/// Dos formas de mostrarlo:
+/// - Pantalla completa (celular): con su barra de arriba y flecha de
+///   regresar.
+/// - [embedded] (vista de PC): dentro de la tercera columna, con una barra
+///   de herramientas propia y una X para cerrar ([onClose]). Quien lo
+///   contiene puede pedirle con [NoteEditorScreenState.prepareToLeave] que
+///   resuelva los cambios pendientes antes de abrir otra nota.
 class NoteEditorScreen extends StatefulWidget {
   const NoteEditorScreen({
     super.key,
     required this.note,
     required this.storage,
     required this.settings,
+    this.embedded = false,
+    this.onSaved,
+    this.onDeleted,
+    this.onClose,
   });
 
   final Note note;
   final NoteStorage storage;
   final AppSettings settings;
 
+  /// Dentro de otra pantalla (vista de PC), en vez de pantalla completa.
+  final bool embedded;
+
+  /// Se guardó (o se movió) la nota: así queda ahora.
+  final ValueChanged<Note>? onSaved;
+
+  /// Se borró la nota.
+  final VoidCallback? onDeleted;
+
+  /// Solo [embedded]: se pidió cerrar la nota y los cambios ya se
+  /// resolvieron (guardados o descartados).
+  final VoidCallback? onClose;
+
   @override
-  State<NoteEditorScreen> createState() => _NoteEditorScreenState();
+  State<NoteEditorScreen> createState() => NoteEditorScreenState();
 }
 
-class _NoteEditorScreenState extends State<NoteEditorScreen> {
+class NoteEditorScreenState extends State<NoteEditorScreen> {
+  // Orden de Tab dentro del editor.
+  static const double _titleOrder = 1;
+  static const double _contentOrder = 2;
+  static const double _closeOrder = 3;
+  static const double _saveOrder = 4;
+  static const double _menuOrder = 5;
+
   static const Duration _autosaveDelay = Duration(seconds: 2);
 
   /// La nota tal como está guardada en disco (o en blanco si es nueva).
@@ -155,6 +188,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     try {
       _note = await widget.storage.saveNote(draft);
       _error = null;
+      widget.onSaved?.call(_note);
     } catch (e) {
       _error = _EditorError.save(e);
     } finally {
@@ -170,31 +204,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final l10n = context.l10n;
     if (_isEmptyNew) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(l10n.emptyNoteNotSaved)));
+      messenger.showMessage(l10n.emptyNoteNotSaved);
       return;
     }
     await _save();
     if (_error == null) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(l10n.noteSaved),
-          duration: const Duration(seconds: 1),
-        ));
+      messenger.showMessage(l10n.noteSaved,
+          duration: const Duration(milliseconds: 1500));
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Mover a otra colección
+  // Mover a otro grupo
   // ---------------------------------------------------------------------------
 
   Future<void> _move() async {
-    final target = await pickCollectionForMove(
+    final target = await pickGroupForMove(
       context,
       storage: widget.storage,
-      current: _note.collection,
+      current: _note.group,
     );
     if (target == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -207,7 +235,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveQueue = _saveQueue.then((_) async {
       if (_deleted) return;
       try {
-        _note = await widget.storage.moveNote(_note, target.collection);
+        _note = await widget.storage.moveNote(_note, target.group);
+        widget.onSaved?.call(_note);
       } catch (e) {
         error = e;
       }
@@ -215,14 +244,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     await _saveQueue;
     if (!mounted) return;
 
-    final name = target.collection;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(error != null
-            ? l10n.errorText(error!)
-            : (name == null ? l10n.noteMovedToNone : l10n.noteMovedTo(name))),
-      ));
+    final name = target.group;
+    if (error != null) {
+      messenger.showMessage(l10n.errorText(error!), isError: true);
+    } else {
+      messenger.showMessage(
+          name == null ? l10n.noteMovedToNone : l10n.noteMovedTo(name));
+    }
     _onChanged(); // si quedaron cambios sin guardar, reanuda el autoguardado
   }
 
@@ -263,7 +291,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return choice ?? _LeaveChoice.cancel;
   }
 
-  /// Resuelve los cambios pendientes. Devuelve `true` si ya se puede salir.
+  /// Resuelve los cambios pendientes (guarda, o pregunta si no hay
+  /// autoguardado). Devuelve `true` si ya se puede cerrar la nota o abrir
+  /// otra en su lugar.
+  Future<bool> prepareToLeave() => _prepareToLeave();
+
+  /// Cerrar la nota (como la X o la flecha de regresar), resolviendo antes
+  /// sus cambios. La usa el atajo Esc de la vista de PC.
+  void close() => _leave();
+
   Future<bool> _prepareToLeave() async {
     _autosaveTimer?.cancel();
     if (_deleted || !_hasUnsavedChanges) return true;
@@ -311,7 +347,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _leaving = true;
     final canLeave = await _prepareToLeave();
     _leaving = false;
-    if (canLeave && mounted) Navigator.of(context).pop();
+    if (!canLeave || !mounted) return;
+    if (widget.embedded) {
+      widget.onClose?.call();
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<AppExitResponse> _onExitRequested() async {
@@ -331,9 +372,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     await _saveQueue; // esperar a que termine cualquier guardado en curso
     try {
       await widget.storage
-          .deleteNote(_note.fileName!, collection: _note.collection);
+          .deleteNote(_note.fileName!, group: _note.group);
       _deleted = true;
-      if (mounted) Navigator.of(context).pop();
+      if (widget.embedded) {
+        widget.onDeleted?.call();
+      } else {
+        widget.onDeleted?.call();
+        if (mounted) Navigator.of(context).pop();
+      }
     } catch (e) {
       if (mounted) setState(() => _error = _EditorError.delete(e));
     }
@@ -343,11 +389,192 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   // Pantalla
   // ---------------------------------------------------------------------------
 
-  @override
-  Widget build(BuildContext context) {
+  /// Estado (Guardado, Sin guardar…) en gris, o en rojo si hubo error.
+  Widget _buildStatus(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Text(
+      _status(context.l10n),
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: _error != null ? colors.error : colors.onSurfaceVariant,
+      ),
+    );
+  }
+
+  /// Guardar y menú ⋮ (Autoguardado, Mover a…, Borrar nota).
+  List<Widget> _buildActions(BuildContext context) {
+    final l10n = context.l10n;
+    return [
+      FocusTraversalOrder(
+        order: const NumericFocusOrder(_saveOrder),
+        child: IconButton(
+          tooltip: l10n.saveTooltip,
+          icon: const Icon(Icons.save_outlined),
+          onPressed: _manualSave,
+        ),
+      ),
+      FocusTraversalOrder(
+        order: const NumericFocusOrder(_menuOrder),
+        child: PopupMenuButton<String>(
+        tooltip: l10n.moreOptions,
+        onSelected: (value) {
+          if (value == 'autosave') _toggleAutosave();
+          if (value == 'move') _move();
+          if (value == 'delete') _delete();
+        },
+        itemBuilder: (context) => [
+          CheckedPopupMenuItem(
+            value: 'autosave',
+            checked: widget.settings.autosave,
+            child: Text(l10n.autosaveTitle),
+          ),
+          PopupMenuItem(
+            value: 'move',
+            child: Text(l10n.moveTo),
+          ),
+          if (_note.isSaved)
+            PopupMenuItem(
+              value: 'delete',
+              child: Text(l10n.deleteNote),
+            ),
+        ],
+      ),
+      ),
+    ];
+  }
+
+  /// Título y texto de la nota.
+  Widget _buildFields(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(_error!.message(l10n),
+                style: TextStyle(color: colors.error)),
+          ),
+        FocusTraversalOrder(
+          order: const NumericFocusOrder(_titleOrder),
+          child: TextField(
+          controller: _title,
+          autofocus: !_note.isSaved, // nota nueva: empieza en el título
+          style: theme.textTheme.headlineSmall,
+          decoration: InputDecoration(
+            hintText: l10n.titleHint,
+            border: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            counterText: '', // oculta el contador de caracteres
+            errorText:
+                _forbiddenHint.visible ? l10n.errorTitleForbiddenChars : null,
+          ),
+          maxLength: NoteStorage.maxTitleLength,
+          // No deja escribir / \ : * ? " < > | y avisa.
+          inputFormatters: [_titleFormatter],
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _contentFocus.requestFocus(),
+        ),
+        ),
+        Expanded(
+          child: FocusTraversalOrder(
+            order: const NumericFocusOrder(_contentOrder),
+            child: TextField(
+            controller: _content,
+            focusNode: _contentFocus,
+            maxLines: null,
+            expands: true,
+            keyboardType: TextInputType.multiline,
+            textAlignVertical: TextAlignVertical.top,
+            style: theme.textTheme.bodyLarge,
+            decoration: InputDecoration(
+              hintText: l10n.contentHint,
+              border: InputBorder.none,
+            ),
+          ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
+    Widget page;
+    if (widget.embedded) {
+      // Vista de PC: barra de herramientas propia + texto con ancho cómodo
+      // para leer.
+      page = Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: SafeArea(
+          left: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    if (widget.onClose != null)
+                      FocusTraversalOrder(
+                        order: const NumericFocusOrder(_closeOrder),
+                        child: IconButton(
+                          tooltip: '${l10n.closeNote} (Esc)',
+                          icon: const Icon(Icons.close),
+                          onPressed: _leave,
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildStatus(context)),
+                    ..._buildActions(context),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(32, 16, 32, 16),
+                      child: _buildFields(context),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      page = Scaffold(
+        appBar: AppBar(
+          title: _buildStatus(context),
+          actions: _buildActions(context),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: _buildFields(context),
+          ),
+        ),
+      );
+    }
+
+    // Orden del teclado (Tab): título → texto → X → guardar → ⋮. Sin esto,
+    // Tab desde el título saltaba a otra parte de la ventana.
+    page = FocusTraversalGroup(
+      policy: OrderedTraversalPolicy(),
+      child: page,
+    );
 
     return PopScope(
       canPop: false, // la salida pasa siempre por _leave()
@@ -358,99 +585,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         bindings: {
           const SingleActivator(LogicalKeyboardKey.keyS, control: true):
               _manualSave,
+          // Esc cierra la nota (igual que la X o la flecha de regresar).
+          const SingleActivator(LogicalKeyboardKey.escape): _leave,
         },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(
-              _status(l10n),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: _error != null ? colors.error : colors.onSurfaceVariant,
-              ),
-            ),
-            actions: [
-              IconButton(
-                tooltip: l10n.saveTooltip,
-                icon: const Icon(Icons.save_outlined),
-                onPressed: _manualSave,
-              ),
-              PopupMenuButton<String>(
-                tooltip: l10n.moreOptions,
-                onSelected: (value) {
-                  if (value == 'autosave') _toggleAutosave();
-                  if (value == 'move') _move();
-                  if (value == 'delete') _delete();
-                },
-                itemBuilder: (context) => [
-                  CheckedPopupMenuItem(
-                    value: 'autosave',
-                    checked: widget.settings.autosave,
-                    child: Text(l10n.autosaveTitle),
-                  ),
-                  PopupMenuItem(
-                    value: 'move',
-                    child: Text(l10n.moveTo),
-                  ),
-                  if (_note.isSaved)
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text(l10n.deleteNote),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(_error!.message(l10n),
-                          style: TextStyle(color: colors.error)),
-                    ),
-                  TextField(
-                    controller: _title,
-                    autofocus: !_note.isSaved, // nota nueva: empieza en el título
-                    style: theme.textTheme.headlineSmall,
-                    decoration: InputDecoration(
-                      hintText: l10n.titleHint,
-                      border: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      focusedErrorBorder: InputBorder.none,
-                      counterText: '', // oculta el contador de caracteres
-                      errorText: _forbiddenHint.visible
-                          ? l10n.errorTitleForbiddenChars
-                          : null,
-                    ),
-                    maxLength: NoteStorage.maxTitleLength,
-                    // No deja escribir / \ : * ? " < > | y avisa.
-                    inputFormatters: [_titleFormatter],
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) => _contentFocus.requestFocus(),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _content,
-                      focusNode: _contentFocus,
-                      maxLines: null,
-                      expands: true,
-                      keyboardType: TextInputType.multiline,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: theme.textTheme.bodyLarge,
-                      decoration: InputDecoration(
-                        hintText: l10n.contentHint,
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        child: page,
       ),
     );
   }

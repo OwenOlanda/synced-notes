@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>E3: panel de grupos abierto</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#EDEDEF}a:hover{color:#FFFFFF}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #121214; color: #EDEDEF; font-family: 'Figtree', system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+
+<header style="display: flex; align-items: center; padding: 16px 8px 0 20px; height: 44px">
+<h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em">Synced Notes</h1>
+</header>
+<div style="padding: 2px 20px 12px; color: #A0A0AB; font-size: 14px">Todas · 7 notas</div>
+<div style="padding: 0 20px; display: flex; flex-direction: column; gap: 22px; font-size: 17px; font-weight: 600">
+<span>tabata</span><span>Cardio</span><span>Receta Jugo Verde</span>
+</div>
+
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(0,0,0,0.55)"></div>
+
+<section aria-label="Grupos" style="position: absolute; left: 0; right: 0; bottom: 0; height: 640px; box-sizing: border-box; background: #1C1C20; border-top: 1px solid #2C2C32; border-radius: 24px 24px 0 0; padding: 8px 0 22px; display: flex; flex-direction: column; gap: 12px">
+<div aria-hidden="true" style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: #4A4A52"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 16px 0 20px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">Grupos</h2>
+<button type="button" style="height: 44px; padding: 0 16px 0 12px; border-radius: 22px; border: 1px solid #3A3A42; background: #222227; color: #EDEDEF; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EDEDEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M12 10.5v5M9.5 13h5"></path></svg>
+Nuevo grupo
+</button>
+</div>
+<label style="margin: 0 16px; height: 48px; border-radius: 24px; background: #222227; border: 1px solid #3A3A42; display: flex; align-items: center; gap: 10px; padding: 0 16px; color: #A0A0AB; font-size: 15px">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A0A0AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+<input type="text" placeholder="Buscar grupo" style="flex: 1; min-width: 0; background: none; border: none; outline: none; color: #EDEDEF; font-family: inherit; font-size: 15px">
+</label>
+<ul style="list-style: none; margin: 0; padding: 0 8px; display: flex; flex-direction: column; overflow: hidden">
+<li style="height: 52px; padding: 0 4px 0 14px; border-radius: 14px; background: #2A2A30; display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 16px; font-weight: 600">Todas</span><span style="font-size: 14px; color: #A0A0AB">7</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EDEDEF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg><span style="width: 44px"></span></li>
+<li style="height: 52px; padding: 0 4px 0 14px; border-radius: 14px; display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 16px; font-weight: 500; color: #A0A0AB">Sin grupo</span><span style="font-size: 14px; color: #A0A0AB">3</span><span style="width: 74px"></span></li>
+<li aria-hidden="true" style="height: 1px; background: #2C2C32; margin: 6px 14px"></li>
+<li style="height: 52px; padding: 0 4px 0 14px; border-radius: 14px; display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 16px; font-weight: 600; color: #F2C94C">Rutinas</span><span style="font-size: 14px; color: #A0A0AB">2</span><span style="width: 20px"></span><button type="button" aria-label="Opciones del grupo" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#A0A0AB"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg></button></li>
+<li style="height: 52px; padding: 0 4px 0 14px; border-radius: 14px; display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 16px; font-weight: 600; color: #9AA5F2">Recetas</span><span style="font-size: 14px; color: #A0A0AB">1</span><span style="width: 20px"></span><button type="button" aria-label="Opciones del grupo" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#A0A0AB"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg></button></li>
+<li style="height: 52px; padding: 0 4px 0 14px; border-radius: 14px; display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 16px; font-weight: 600; color: #F06292">Frases</span><span style="font-size: 14px; color: #A0A0AB">1</span><span style="width: 20px"></span><button type="button" aria-label="Opciones del grupo" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#A0A0AB"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg></button></li>
+<li style="height: 52px; padding: 0 4px 0 14px; border-radius: 14px; display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 16px; font-weight: 600; color: #6FCF97">Trabajo</span><span style="font-size: 14px; color: #A0A0AB">0</span><span style="width: 20px"></span><button type="button" aria-label="Opciones del grupo" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#A0A0AB"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg></button></li>
+<li style="height: 52px; padding: 0 4px 0 14px; border-radius: 14px; display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 16px; font-weight: 600">Cartas</span><span style="font-size: 14px; color: #A0A0AB">0</span><span style="width: 20px"></span><button type="button" aria-label="Opciones del grupo" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#A0A0AB"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg></button></li>
+</ul>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

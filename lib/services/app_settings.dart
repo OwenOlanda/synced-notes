@@ -2,12 +2,12 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/collection_filter.dart';
+import '../models/group_filter.dart';
 
 /// Ajustes de la app que se recuerdan entre sesiones:
 /// - si el autoguardado está activado;
 /// - el idioma elegido a mano (o ninguno = idioma del sistema);
-/// - qué colección se estaba viendo en la lista;
+/// - qué grupo se estaba viendo en la lista;
 /// - el tema (claro, oscuro o el del sistema).
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._prefs);
@@ -16,7 +16,7 @@ class AppSettings extends ChangeNotifier {
 
   static const String _autosaveKey = 'autosave_enabled';
   static const String _languageKey = 'language_code';
-  static const String _selectedCollectionKey = 'selected_collection';
+  static const String _selectedGroupKey = 'selected_group';
   static const String _themeModeKey = 'theme_mode';
 
   static Future<AppSettings> load() async =>
@@ -43,13 +43,13 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Lo que se estaba viendo en la lista (Todas, Sin colección o una
-  /// colección). Se recuerda al cerrar la app. Por defecto: Todas.
-  CollectionFilter get selectedCollection =>
-      CollectionFilter.decode(_prefs.getString(_selectedCollectionKey));
+  /// Lo que se estaba viendo en la lista (Todas, Sin grupo o un
+  /// grupo). Se recuerda al cerrar la app. Por defecto: Todas.
+  GroupFilter get selectedGroup =>
+      GroupFilter.decode(_prefs.getString(_selectedGroupKey));
 
-  Future<void> setSelectedCollection(CollectionFilter filter) async {
-    await _prefs.setString(_selectedCollectionKey, filter.encode());
+  Future<void> setSelectedGroup(GroupFilter filter) async {
+    await _prefs.setString(_selectedGroupKey, filter.encode());
     notifyListeners();
   }
 

@@ -8,8 +8,8 @@
 ///   aunque cambie el título (servirá para reconocer la nota al sincronizar).
 /// - Lo que sigue es el título que escribió el usuario (puede estar vacío).
 /// - El contenido es el texto del archivo.
-/// - Si la nota está en una colección, el archivo vive en la subcarpeta de
-///   esa colección (ej. `Synced Notes/Recetas/…`); si no, en la raíz.
+/// - Si la nota está en un grupo, el archivo vive en la subcarpeta de
+///   ese grupo (ej. `Synced Notes/Recetas/…`); si no, en la raíz.
 ///
 /// Esta clase no sabe nada de archivos ni de idiomas. Solo guarda los datos.
 /// El que lee y escribe en disco es NoteStorage. El título que se muestra
@@ -18,7 +18,7 @@
 class Note {
   const Note({
     this.fileName,
-    this.collection,
+    this.group,
     required this.title,
     required this.content,
     required this.createdAt,
@@ -26,14 +26,14 @@ class Note {
   });
 
   /// Una nota nueva, vacía y todavía sin guardar.
-  /// [collection]: dónde se va a crear (`null` = sin colección).
-  factory Note.blank({String? collection}) {
+  /// [group]: dónde se va a crear (`null` = sin grupo).
+  factory Note.blank({String? group}) {
     final now = DateTime.now();
     // Sin milisegundos: el nombre del archivo solo guarda hasta los segundos.
     final created = DateTime(
         now.year, now.month, now.day, now.hour, now.minute, now.second);
     return Note(
-      collection: collection,
+      group: group,
       title: '',
       content: '',
       createdAt: created,
@@ -45,9 +45,9 @@ class Note {
   /// Es `null` si la nota todavía no se ha guardado nunca.
   final String? fileName;
 
-  /// Nombre de la colección donde vive la nota. `null` = sin colección
+  /// Nombre del grupo donde vive la nota. `null` = sin grupo
   /// (el archivo está en la raíz de la carpeta de notas).
-  final String? collection;
+  final String? group;
 
   /// Título que escribió el usuario. Puede estar vacío.
   final String title;
@@ -70,11 +70,11 @@ class Note {
   /// ¿No tiene ni título ni texto? Las notas nuevas en blanco no se guardan.
   bool get isBlank => title.trim().isEmpty && content.trim().isEmpty;
 
-  /// La misma nota, pero en otra colección (`null` = sin colección).
+  /// La misma nota, pero en otro grupo (`null` = sin grupo).
   /// (copyWith no sirve para esto: no puede distinguir "no cambiar" de "null").
-  Note withCollection(String? collection) => Note(
+  Note withGroup(String? group) => Note(
         fileName: fileName,
-        collection: collection,
+        group: group,
         title: title,
         content: content,
         createdAt: createdAt,
@@ -92,7 +92,7 @@ class Note {
   }) {
     return Note(
       fileName: fileName ?? this.fileName,
-      collection: collection,
+      group: group,
       title: title ?? this.title,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
@@ -102,6 +102,6 @@ class Note {
 
   @override
   String toString() =>
-      'Note(${collection ?? "-"}/${fileName ?? "sin guardar"}, '
+      'Note(${group ?? "-"}/${fileName ?? "sin guardar"}, '
       '${content.length} caracteres)';
 }

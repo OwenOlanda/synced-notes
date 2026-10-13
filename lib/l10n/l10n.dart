@@ -57,14 +57,14 @@ extension NoteTexts on AppLocalizations {
         NoteError.titleControlChars => errorTitleControlChars,
         NoteError.noteNotFound => errorNoteNotFound,
         NoteError.duplicateName => errorDuplicateName,
-        NoteError.collectionNameEmpty => errorCollectionNameEmpty,
-        NoteError.collectionNameTooLong =>
-          errorCollectionNameTooLong(NoteStorage.maxTitleLength),
-        NoteError.collectionNameForbiddenChars =>
-          errorCollectionNameForbiddenChars,
-        NoteError.collectionNameReserved => errorCollectionNameReserved,
-        NoteError.collectionExists => errorCollectionExists,
-        NoteError.collectionNotFound => errorCollectionNotFound,
+        NoteError.groupNameEmpty => errorGroupNameEmpty,
+        NoteError.groupNameTooLong =>
+          errorGroupNameTooLong(NoteStorage.maxTitleLength),
+        NoteError.groupNameForbiddenChars =>
+          errorGroupNameForbiddenChars,
+        NoteError.groupNameReserved => errorGroupNameReserved,
+        NoteError.groupExists => errorGroupExists,
+        NoteError.groupNotFound => errorGroupNotFound,
         NoteError.permissionDenied => errorPermissionDenied,
       };
 

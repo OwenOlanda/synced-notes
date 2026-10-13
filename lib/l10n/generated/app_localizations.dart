@@ -311,7 +311,7 @@ abstract class AppLocalizations {
   /// No description provided for @emptyNotes.
   ///
   /// In en, this message translates to:
-  /// **'You don\'t have any notes yet.\nTap + to create one.'**
+  /// **'You don\'t have any notes yet.\nTap \"New note\" to create one.'**
   String get emptyNotes;
 
   /// Preview shown in the list for a note with a title but no text.
@@ -512,41 +512,41 @@ abstract class AppLocalizations {
   /// **'PM'**
   String get timePm;
 
-  /// No description provided for @errorCollectionNameEmpty.
+  /// No description provided for @errorGroupNameEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Write a name for the collection.'**
-  String get errorCollectionNameEmpty;
+  /// **'Write a name for the group.'**
+  String get errorGroupNameEmpty;
 
-  /// No description provided for @errorCollectionNameTooLong.
+  /// No description provided for @errorGroupNameTooLong.
   ///
   /// In en, this message translates to:
-  /// **'The collection name can\'t be longer than {max} characters.'**
-  String errorCollectionNameTooLong(int max);
+  /// **'The group name can\'t be longer than {max} characters.'**
+  String errorGroupNameTooLong(int max);
 
-  /// No description provided for @errorCollectionNameForbiddenChars.
+  /// No description provided for @errorGroupNameForbiddenChars.
   ///
   /// In en, this message translates to:
-  /// **'The collection name can\'t contain: / \\ : * ? \" < > |'**
-  String get errorCollectionNameForbiddenChars;
+  /// **'The group name can\'t contain: / \\ : * ? \" < > |'**
+  String get errorGroupNameForbiddenChars;
 
-  /// No description provided for @errorCollectionNameReserved.
+  /// No description provided for @errorGroupNameReserved.
   ///
   /// In en, this message translates to:
-  /// **'That name can\'t be used for a collection: it\'s reserved by the system, or it starts or ends with a period.'**
-  String get errorCollectionNameReserved;
+  /// **'That name can\'t be used for a group: it\'s reserved by the system, or it starts or ends with a period.'**
+  String get errorGroupNameReserved;
 
-  /// No description provided for @errorCollectionExists.
+  /// No description provided for @errorGroupExists.
   ///
   /// In en, this message translates to:
-  /// **'A collection with that name already exists.'**
-  String get errorCollectionExists;
+  /// **'A group with that name already exists.'**
+  String get errorGroupExists;
 
-  /// No description provided for @errorCollectionNotFound.
+  /// No description provided for @errorGroupNotFound.
   ///
   /// In en, this message translates to:
-  /// **'The collection no longer exists.'**
-  String get errorCollectionNotFound;
+  /// **'The group no longer exists.'**
+  String get errorGroupNotFound;
 
   /// No description provided for @errorPermissionDenied.
   ///
@@ -554,29 +554,29 @@ abstract class AppLocalizations {
   /// **'The app doesn\'t have permission to change this file or folder.'**
   String get errorPermissionDenied;
 
-  /// Chip that shows all notes, from every collection.
+  /// Chip that shows all notes, from every group.
   ///
   /// In en, this message translates to:
   /// **'All'**
-  String get collectionsAll;
+  String get groupsAll;
 
-  /// Chip that shows only the notes that aren't in any collection.
+  /// Chip that shows only the notes that aren't in any group.
   ///
   /// In en, this message translates to:
-  /// **'No collection'**
-  String get collectionsNone;
+  /// **'No group'**
+  String get groupsNone;
 
-  /// No description provided for @newCollection.
+  /// No description provided for @newGroup.
   ///
   /// In en, this message translates to:
-  /// **'New collection'**
-  String get newCollection;
+  /// **'New group'**
+  String get newGroup;
 
-  /// No description provided for @collectionNameHint.
+  /// No description provided for @groupNameHint.
   ///
   /// In en, this message translates to:
   /// **'Name'**
-  String get collectionNameHint;
+  String get groupNameHint;
 
   /// No description provided for @create.
   ///
@@ -590,17 +590,17 @@ abstract class AppLocalizations {
   /// **'Rename'**
   String get rename;
 
-  /// No description provided for @renameCollection.
+  /// No description provided for @renameGroup.
   ///
   /// In en, this message translates to:
-  /// **'Rename collection'**
-  String get renameCollection;
+  /// **'Rename group'**
+  String get renameGroup;
 
-  /// No description provided for @collectionColor.
+  /// No description provided for @groupColor.
   ///
   /// In en, this message translates to:
   /// **'Color'**
-  String get collectionColor;
+  String get groupColor;
 
   /// No description provided for @colorNone.
   ///
@@ -608,28 +608,28 @@ abstract class AppLocalizations {
   /// **'No color'**
   String get colorNone;
 
-  /// No description provided for @deleteCollectionQuestion.
+  /// No description provided for @deleteGroupQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete the collection \"{name}\"?'**
-  String deleteCollectionQuestion(String name);
+  /// **'Delete the group \"{name}\"?'**
+  String deleteGroupQuestion(String name);
 
-  /// No description provided for @deleteEmptyCollectionMessage.
+  /// No description provided for @deleteEmptyGroupMessage.
   ///
   /// In en, this message translates to:
-  /// **'The collection is empty.'**
-  String get deleteEmptyCollectionMessage;
+  /// **'The group is empty.'**
+  String get deleteEmptyGroupMessage;
 
-  /// No description provided for @deleteCollectionWithNotes.
+  /// No description provided for @deleteGroupWithNotes.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =1{It has 1 note. What do you want to do with it?} other{It has {count} notes. What do you want to do with them?}}'**
-  String deleteCollectionWithNotes(int count);
+  String deleteGroupWithNotes(int count);
 
-  /// Option when deleting a collection: keep its notes, without a collection.
+  /// Option when deleting a group: keep its notes, without a group.
   ///
   /// In en, this message translates to:
-  /// **'Move to \"No collection\"'**
+  /// **'Move to \"No group\"'**
   String get moveNotesToNone;
 
   /// No description provided for @deleteNotesToo.
@@ -638,16 +638,16 @@ abstract class AppLocalizations {
   /// **'Delete the notes too'**
   String get deleteNotesToo;
 
-  /// No description provided for @collectionDeleted.
+  /// No description provided for @groupDeleted.
   ///
   /// In en, this message translates to:
-  /// **'Collection deleted'**
-  String get collectionDeleted;
+  /// **'Group deleted'**
+  String get groupDeleted;
 
-  /// Shown when the selected collection (or 'No collection') has no notes.
+  /// Shown when the selected group (or 'No group') has no notes.
   ///
   /// In en, this message translates to:
-  /// **'No notes here yet.\nTap + to create one.'**
+  /// **'No notes here yet.\nTap \"New note\" to create one.'**
   String get emptyFilter;
 
   /// No description provided for @moveTo.
@@ -662,11 +662,11 @@ abstract class AppLocalizations {
   /// **'Move note to'**
   String get moveNoteTitle;
 
-  /// No description provided for @newCollectionEllipsis.
+  /// No description provided for @newGroupEllipsis.
   ///
   /// In en, this message translates to:
-  /// **'New collection…'**
-  String get newCollectionEllipsis;
+  /// **'New group…'**
+  String get newGroupEllipsis;
 
   /// No description provided for @noteMovedTo.
   ///
@@ -677,10 +677,10 @@ abstract class AppLocalizations {
   /// No description provided for @noteMovedToNone.
   ///
   /// In en, this message translates to:
-  /// **'Note moved to \"No collection\"'**
+  /// **'Note moved to \"No group\"'**
   String get noteMovedToNone;
 
-  /// Tooltip of the + button while viewing a collection.
+  /// Tooltip of the + button while viewing a group.
   ///
   /// In en, this message translates to:
   /// **'New note in \"{name}\"'**
@@ -715,6 +715,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dark'**
   String get themeDark;
+
+  /// No description provided for @notesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No notes} =1{1 note} other{{count} notes}}'**
+  String notesCount(int count);
+
+  /// No description provided for @searchGroupsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search groups'**
+  String get searchGroupsHint;
+
+  /// No description provided for @noGroupsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No groups with that name'**
+  String get noGroupsFound;
+
+  /// No description provided for @groupOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Group options'**
+  String get groupOptions;
+
+  /// Label of the groups panel at the bottom of the list, and title of that panel when it is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Note groups'**
+  String get noteGroupsTitle;
+
+  /// Accessibility label / tooltip of the handle that opens the groups panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all groups'**
+  String get showAllGroups;
+
+  /// Gray line under the app name: what is being viewed and how many notes. Example: 'All · 7 notes'.
+  ///
+  /// In en, this message translates to:
+  /// **'{view} · {notes}'**
+  String listSummary(String view, String notes);
+
+  /// Tooltip of the X button that closes the note open in the editor column (wide/PC view).
+  ///
+  /// In en, this message translates to:
+  /// **'Close note'**
+  String get closeNote;
+
+  /// Shown in the editor column (wide/PC view) when no note is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a note from the list\nor create a new one.'**
+  String get noNoteOpen;
+
+  /// First line of the big 'new note' button (wide/PC view) while viewing a group; the group name goes on the line below.
+  ///
+  /// In en, this message translates to:
+  /// **'New note in'**
+  String get newNoteInPrefix;
 }
 
 class _AppLocalizationsDelegate

@@ -1,0 +1,42 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-13T07:10:00Z"},
+  "title": "Synced Notes — Propuestas v2 (celular)",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "D1 · Barra inferior: colección + Nueva nota"},
+    "ChipsAbajo.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "D2 · Chips de colecciones abajo"},
+    "FranjaAbajo.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "D3 · Franja de colección hasta abajo"},
+    "GruposSinTinte.dc.html": {"x": 0, "y": 1244, "w": 390, "h": 844, "title": "E1 · Grupos abajo, filas sin tinte"},
+    "GruposTinte.dc.html": {"x": 470, "y": 1244, "w": 390, "h": 844, "title": "E2 · Igual, filas con tinte del grupo"},
+    "GruposAbiertos.dc.html": {"x": 940, "y": 1244, "w": 390, "h": 844, "title": "E3 · Panel deslizado hacia arriba: todos los grupos"},
+    "TextoEnBotones.dc.html": {"x": 1410, "y": 1244, "w": 390, "h": 844, "title": "E4 · Mantener presionado: el botón muestra u oculta su texto"},
+    "BarraIzquierda.dc.html": {"x": 0, "y": 2488, "w": 390, "h": 844, "title": "F1 · Barrita de color a la izquierda"},
+    "BarraDerecha.dc.html": {"x": 470, "y": 2488, "w": 390, "h": 844, "title": "F2 · Barrita de color a la derecha"},
+    "BarraTenue.dc.html": {"x": 940, "y": 2488, "w": 390, "h": 844, "title": "F3 · Barrita izquierda con tono tenue"},
+    "ContornoIzquierdo.dc.html": {"x": 1410, "y": 2488, "w": 390, "h": 844, "title": "F4 · Solo el contorno izquierdo coloreado"},
+    "Final.dc.html": {"x": 0, "y": 3732, "w": 390, "h": 844, "title": "Final · F1 + nombre del grupo más chico + \"Grupos de notas\""}
+  },
+  "order": [
+    "Main.dc.html",
+    "ChipsAbajo.dc.html",
+    "FranjaAbajo.dc.html",
+    "GruposSinTinte.dc.html",
+    "GruposTinte.dc.html",
+    "GruposAbiertos.dc.html",
+    "TextoEnBotones.dc.html",
+    "BarraIzquierda.dc.html",
+    "BarraDerecha.dc.html",
+    "BarraTenue.dc.html",
+    "ContornoIzquierdo.dc.html",
+    "Final.dc.html"
+  ],
+  "notes": {
+    "fila1": {"x": 0, "y": -300, "text": "Celular v2: sin puntito y colección abajo", "kind": "title1", "maxW": 1330},
+    "fila2": {"x": 0, "y": 944, "text": "D2 ajustado: grupos, nombre de la app y texto en botones", "kind": "title1", "maxW": 1800},
+    "fila3": {"x": 0, "y": 2188, "text": "Color del grupo como barrita lateral", "kind": "title1", "maxW": 1800},
+    "fila4": {"x": 0, "y": 3432, "text": "Elegido", "kind": "title1", "maxW": 390}
+  },
+  "designSystems": []
+}
