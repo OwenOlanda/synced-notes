@@ -511,6 +511,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'PM'**
   String get timePm;
+
+  /// No description provided for @errorCollectionNameEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a name for the collection.'**
+  String get errorCollectionNameEmpty;
+
+  /// No description provided for @errorCollectionNameTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'The collection name can\'t be longer than {max} characters.'**
+  String errorCollectionNameTooLong(int max);
+
+  /// No description provided for @errorCollectionNameForbiddenChars.
+  ///
+  /// In en, this message translates to:
+  /// **'The collection name can\'t contain: / \\ : * ? \" < > |'**
+  String get errorCollectionNameForbiddenChars;
+
+  /// No description provided for @errorCollectionNameReserved.
+  ///
+  /// In en, this message translates to:
+  /// **'That name can\'t be used for a collection: it\'s reserved by the system, or it starts or ends with a period.'**
+  String get errorCollectionNameReserved;
+
+  /// No description provided for @errorCollectionExists.
+  ///
+  /// In en, this message translates to:
+  /// **'A collection with that name already exists.'**
+  String get errorCollectionExists;
+
+  /// No description provided for @errorCollectionNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'The collection no longer exists.'**
+  String get errorCollectionNotFound;
+
+  /// No description provided for @errorPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'The app doesn\'t have permission to change this file or folder.'**
+  String get errorPermissionDenied;
+
+  /// Chip that shows all notes, from every collection.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get collectionsAll;
+
+  /// Chip that shows only the notes that aren't in any collection.
+  ///
+  /// In en, this message translates to:
+  /// **'No collection'**
+  String get collectionsNone;
+
+  /// No description provided for @newCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'New collection'**
+  String get newCollection;
+
+  /// No description provided for @collectionNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get collectionNameHint;
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// No description provided for @rename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get rename;
+
+  /// No description provided for @renameCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename collection'**
+  String get renameCollection;
+
+  /// No description provided for @collectionColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get collectionColor;
+
+  /// No description provided for @colorNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No color'**
+  String get colorNone;
+
+  /// No description provided for @deleteCollectionQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the collection \"{name}\"?'**
+  String deleteCollectionQuestion(String name);
+
+  /// No description provided for @deleteEmptyCollectionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The collection is empty.'**
+  String get deleteEmptyCollectionMessage;
+
+  /// No description provided for @deleteCollectionWithNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{It has 1 note. What do you want to do with it?} other{It has {count} notes. What do you want to do with them?}}'**
+  String deleteCollectionWithNotes(int count);
+
+  /// Option when deleting a collection: keep its notes, without a collection.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to \"No collection\"'**
+  String get moveNotesToNone;
+
+  /// No description provided for @deleteNotesToo.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the notes too'**
+  String get deleteNotesToo;
+
+  /// No description provided for @collectionDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Collection deleted'**
+  String get collectionDeleted;
+
+  /// Shown when the selected collection (or 'No collection') has no notes.
+  ///
+  /// In en, this message translates to:
+  /// **'No notes here yet.\nTap + to create one.'**
+  String get emptyFilter;
+
+  /// No description provided for @moveTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to…'**
+  String get moveTo;
+
+  /// No description provided for @moveNoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move note to'**
+  String get moveNoteTitle;
+
+  /// No description provided for @newCollectionEllipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'New collection…'**
+  String get newCollectionEllipsis;
+
+  /// No description provided for @noteMovedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Note moved to \"{name}\"'**
+  String noteMovedTo(String name);
+
+  /// No description provided for @noteMovedToNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Note moved to \"No collection\"'**
+  String get noteMovedToNone;
+
+  /// Tooltip of the + button while viewing a collection.
+  ///
+  /// In en, this message translates to:
+  /// **'New note in \"{name}\"'**
+  String newNoteIn(String name);
 }
 
 class _AppLocalizationsDelegate

@@ -8,6 +8,8 @@
 ///   aunque cambie el título (servirá para reconocer la nota al sincronizar).
 /// - Lo que sigue es el título que escribió el usuario (puede estar vacío).
 /// - El contenido es el texto del archivo.
+/// - Si la nota está en una colección, el archivo vive en la subcarpeta de
+///   esa colección (ej. `Synced Notes/Recetas/…`); si no, en la raíz.
 ///
 /// Esta clase no sabe nada de archivos ni de idiomas. Solo guarda los datos.
 /// El que lee y escribe en disco es NoteStorage. El título que se muestra
@@ -16,6 +18,7 @@
 class Note {
   const Note({
     this.fileName,
+    this.collection,
     required this.title,
     required this.content,
     required this.createdAt,
@@ -23,17 +26,28 @@ class Note {
   });
 
   /// Una nota nueva, vacía y todavía sin guardar.
-  factory Note.blank() {
+  /// [collection]: dónde se va a crear (`null` = sin colección).
+  factory Note.blank({String? collection}) {
     final now = DateTime.now();
     // Sin milisegundos: el nombre del archivo solo guarda hasta los segundos.
     final created = DateTime(
         now.year, now.month, now.day, now.hour, now.minute, now.second);
-    return Note(title: '', content: '', createdAt: created, modifiedAt: created);
+    return Note(
+      collection: collection,
+      title: '',
+      content: '',
+      createdAt: created,
+      modifiedAt: created,
+    );
   }
 
   /// Nombre actual del archivo, por ejemplo `2026-10-03_20-59-12 Ideas.txt`.
   /// Es `null` si la nota todavía no se ha guardado nunca.
   final String? fileName;
+
+  /// Nombre de la colección donde vive la nota. `null` = sin colección
+  /// (el archivo está en la raíz de la carpeta de notas).
+  final String? collection;
 
   /// Título que escribió el usuario. Puede estar vacío.
   final String title;
@@ -56,6 +70,17 @@ class Note {
   /// ¿No tiene ni título ni texto? Las notas nuevas en blanco no se guardan.
   bool get isBlank => title.trim().isEmpty && content.trim().isEmpty;
 
+  /// La misma nota, pero en otra colección (`null` = sin colección).
+  /// (copyWith no sirve para esto: no puede distinguir "no cambiar" de "null").
+  Note withCollection(String? collection) => Note(
+        fileName: fileName,
+        collection: collection,
+        title: title,
+        content: content,
+        createdAt: createdAt,
+        modifiedAt: modifiedAt,
+      );
+
   /// Devuelve una copia de la nota con los campos que cambies.
   /// Las notas son inmutables: en lugar de modificarlas, se crea una nueva.
   Note copyWith({
@@ -67,6 +92,7 @@ class Note {
   }) {
     return Note(
       fileName: fileName ?? this.fileName,
+      collection: collection,
       title: title ?? this.title,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
@@ -76,5 +102,6 @@ class Note {
 
   @override
   String toString() =>
-      'Note(${fileName ?? "sin guardar"}, ${content.length} caracteres)';
+      'Note(${collection ?? "-"}/${fileName ?? "sin guardar"}, '
+      '${content.length} caracteres)';
 }

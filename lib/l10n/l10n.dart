@@ -57,12 +57,23 @@ extension NoteTexts on AppLocalizations {
         NoteError.titleControlChars => errorTitleControlChars,
         NoteError.noteNotFound => errorNoteNotFound,
         NoteError.duplicateName => errorDuplicateName,
+        NoteError.collectionNameEmpty => errorCollectionNameEmpty,
+        NoteError.collectionNameTooLong =>
+          errorCollectionNameTooLong(NoteStorage.maxTitleLength),
+        NoteError.collectionNameForbiddenChars =>
+          errorCollectionNameForbiddenChars,
+        NoteError.collectionNameReserved => errorCollectionNameReserved,
+        NoteError.collectionExists => errorCollectionExists,
+        NoteError.collectionNotFound => errorCollectionNotFound,
+        NoteError.permissionDenied => errorPermissionDenied,
       };
 
-  /// Texto para cualquier error: los de NoteStorage se traducen; los demás
-  /// (raros, del sistema) se muestran tal como vienen.
-  String errorText(Object error) =>
-      error is NoteStorageException ? noteError(error.error) : '$error';
+  /// Texto para cualquier error: los que reconoce NoteStorage (incluido
+  /// "permiso denegado") se traducen; los demás (raros) se muestran tal cual.
+  String errorText(Object error) {
+    final known = NoteStorage.errorFor(error);
+    return known != null ? noteError(known) : '$error';
+  }
 }
 
 /// Nombre de un idioma escrito en ese mismo idioma ("English", "Español"),

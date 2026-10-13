@@ -248,4 +248,111 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get timePm => 'PM';
+
+  @override
+  String get errorCollectionNameEmpty => 'Write a name for the collection.';
+
+  @override
+  String errorCollectionNameTooLong(int max) {
+    return 'The collection name can\'t be longer than $max characters.';
+  }
+
+  @override
+  String get errorCollectionNameForbiddenChars =>
+      'The collection name can\'t contain: / \\ : * ? \" < > |';
+
+  @override
+  String get errorCollectionNameReserved =>
+      'That name can\'t be used for a collection: it\'s reserved by the system, or it starts or ends with a period.';
+
+  @override
+  String get errorCollectionExists =>
+      'A collection with that name already exists.';
+
+  @override
+  String get errorCollectionNotFound => 'The collection no longer exists.';
+
+  @override
+  String get errorPermissionDenied =>
+      'The app doesn\'t have permission to change this file or folder.';
+
+  @override
+  String get collectionsAll => 'All';
+
+  @override
+  String get collectionsNone => 'No collection';
+
+  @override
+  String get newCollection => 'New collection';
+
+  @override
+  String get collectionNameHint => 'Name';
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String get renameCollection => 'Rename collection';
+
+  @override
+  String get collectionColor => 'Color';
+
+  @override
+  String get colorNone => 'No color';
+
+  @override
+  String deleteCollectionQuestion(String name) {
+    return 'Delete the collection \"$name\"?';
+  }
+
+  @override
+  String get deleteEmptyCollectionMessage => 'The collection is empty.';
+
+  @override
+  String deleteCollectionWithNotes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'It has $count notes. What do you want to do with them?',
+      one: 'It has 1 note. What do you want to do with it?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get moveNotesToNone => 'Move to \"No collection\"';
+
+  @override
+  String get deleteNotesToo => 'Delete the notes too';
+
+  @override
+  String get collectionDeleted => 'Collection deleted';
+
+  @override
+  String get emptyFilter => 'No notes here yet.\nTap + to create one.';
+
+  @override
+  String get moveTo => 'Move to…';
+
+  @override
+  String get moveNoteTitle => 'Move note to';
+
+  @override
+  String get newCollectionEllipsis => 'New collection…';
+
+  @override
+  String noteMovedTo(String name) {
+    return 'Note moved to \"$name\"';
+  }
+
+  @override
+  String get noteMovedToNone => 'Note moved to \"No collection\"';
+
+  @override
+  String newNoteIn(String name) {
+    return 'New note in \"$name\"';
+  }
 }

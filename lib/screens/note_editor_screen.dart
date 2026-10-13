@@ -8,7 +8,9 @@ import '../l10n/l10n.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
+import '../widgets/blocked_chars_formatter.dart';
 import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/move_note_dialog.dart';
 
 enum _LeaveChoice { save, discard, cancel }
 
@@ -61,6 +63,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final FocusNode _contentFocus = FocusNode();
   late final AppLifecycleListener _lifecycle;
 
+  /// Aviso "el título no puede contener…" al teclear un carácter prohibido.
+  late final TemporaryHint _forbiddenHint = TemporaryHint(() {
+    if (mounted) setState(() {});
+  });
+  late final BlockedCharsFormatter _titleFormatter = BlockedCharsFormatter(
+    NoteStorage.forbiddenTitleChars,
+    onBlocked: _forbiddenHint.show,
+  );
+
   Timer? _autosaveTimer;
   Future<void> _saveQueue = Future.value();
   bool _saving = false;
@@ -85,6 +96,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void dispose() {
     _autosaveTimer?.cancel();
+    _forbiddenHint.dispose();
     _lifecycle.dispose();
     _title.dispose();
     _content.dispose();
@@ -172,6 +184,46 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           duration: const Duration(seconds: 1),
         ));
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mover a otra colección
+  // ---------------------------------------------------------------------------
+
+  Future<void> _move() async {
+    final target = await pickCollectionForMove(
+      context,
+      storage: widget.storage,
+      current: _note.collection,
+    );
+    if (target == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+
+    // El movimiento espera su turno detrás de cualquier guardado en curso,
+    // para no mover el archivo mientras se está escribiendo.
+    _autosaveTimer?.cancel();
+    Object? error;
+    _saveQueue = _saveQueue.then((_) async {
+      if (_deleted) return;
+      try {
+        _note = await widget.storage.moveNote(_note, target.collection);
+      } catch (e) {
+        error = e;
+      }
+    });
+    await _saveQueue;
+    if (!mounted) return;
+
+    final name = target.collection;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(error != null
+            ? l10n.errorText(error!)
+            : (name == null ? l10n.noteMovedToNone : l10n.noteMovedTo(name))),
+      ));
+    _onChanged(); // si quedaron cambios sin guardar, reanuda el autoguardado
   }
 
   Future<void> _toggleAutosave() async {
@@ -278,7 +330,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _autosaveTimer?.cancel();
     await _saveQueue; // esperar a que termine cualquier guardado en curso
     try {
-      await widget.storage.deleteNote(_note.fileName!);
+      await widget.storage
+          .deleteNote(_note.fileName!, collection: _note.collection);
       _deleted = true;
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -324,6 +377,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 tooltip: l10n.moreOptions,
                 onSelected: (value) {
                   if (value == 'autosave') _toggleAutosave();
+                  if (value == 'move') _move();
                   if (value == 'delete') _delete();
                 },
                 itemBuilder: (context) => [
@@ -331,6 +385,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     value: 'autosave',
                     checked: widget.settings.autosave,
                     child: Text(l10n.autosaveTitle),
+                  ),
+                  PopupMenuItem(
+                    value: 'move',
+                    child: Text(l10n.moveTo),
                   ),
                   if (_note.isSaved)
                     PopupMenuItem(
@@ -360,14 +418,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     decoration: InputDecoration(
                       hintText: l10n.titleHint,
                       border: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
                       counterText: '', // oculta el contador de caracteres
+                      errorText: _forbiddenHint.visible
+                          ? l10n.errorTitleForbiddenChars
+                          : null,
                     ),
                     maxLength: NoteStorage.maxTitleLength,
-                    // No deja escribir / \ : * ? " < > |
-                    inputFormatters: [
-                      FilteringTextInputFormatter.deny(
-                          NoteStorage.forbiddenTitleChars),
-                    ],
+                    // No deja escribir / \ : * ? " < > | y avisa.
+                    inputFormatters: [_titleFormatter],
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => _contentFocus.requestFocus(),
                   ),
