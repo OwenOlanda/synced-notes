@@ -685,6 +685,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New note in \"{name}\"'**
   String newNoteIn(String name);
+
+  /// No description provided for @themeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get themeTitle;
+
+  /// Theme option: follow the light/dark setting of the phone or PC.
+  ///
+  /// In en, this message translates to:
+  /// **'System default'**
+  String get themeSystem;
+
+  /// Current choice shown in Settings when following the system. {theme} is the theme actually in use, e.g. 'Dark'.
+  ///
+  /// In en, this message translates to:
+  /// **'System default ({theme})'**
+  String themeSystemWithCurrent(String theme);
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
 }
 
 class _AppLocalizationsDelegate

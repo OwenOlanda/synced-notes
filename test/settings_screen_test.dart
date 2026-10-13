@@ -84,4 +84,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(settings.languageCode, isNull);
   });
+
+  testWidgets('el selector de tema guarda la elección', (tester) async {
+    await showSettings(tester, isWindows: true);
+    expect(find.textContaining('Del sistema'), findsOneWidget);
+
+    await tester.tap(find.text('Tema'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Oscuro'));
+    await tester.pumpAndSettle();
+    expect(settings.themeMode, ThemeMode.dark);
+    expect(find.text('Oscuro'), findsOneWidget); // ahora es el actual
+  });
 }

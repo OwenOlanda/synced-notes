@@ -297,5 +297,22 @@
         "type": "String"
       }
     }
-  }
+  },
+  "themeTitle": "Theme",
+  "themeSystem": "System default",
+  "@themeSystem": {
+    "description": "Theme option: follow the light/dark setting of the phone or PC."
+  },
+  "themeSystemWithCurrent": "System default ({theme})",
+  "@themeSystemWithCurrent": {
+    "description": "Current choice shown in Settings when following the system. {theme} is the theme actually in use, e.g. 'Dark'.",
+    "placeholders": {
+      "theme": {
+        "type": "String",
+        "example": "Dark"
+      }
+    }
+  },
+  "themeLight": "Light",
+  "themeDark": "Dark"
 }

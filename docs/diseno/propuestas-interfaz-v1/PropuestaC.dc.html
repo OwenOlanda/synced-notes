@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Propuesta C: colecciones primero</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#EDEDEF}a:hover{color:#FFFFFF}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #121214; color: #EDEDEF; font-family: 'Figtree', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="display: flex; align-items: center; justify-content: space-between; padding: 20px 12px 12px 20px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 700">Notas</h1>
+<button type="button" aria-label="Ajustes" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: none; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EDEDEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"></path></svg>
+</button>
+</header>
+
+<div style="padding: 0 20px 16px">
+<label style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border-radius: 14px; background: #1C1C20; border: 1px solid #2C2C32">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A0A0AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+<input type="search" placeholder="Buscar en todas las notas" style="flex: 1; background: none; border: none; color: #EDEDEF; font-size: 16px; font-family: inherit; outline: none">
+</label>
+</div>
+
+<div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 18px; padding: 0 12px">
+<div style="background: #1C1C20; border-radius: 18px; overflow: hidden">
+<a href="#" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-decoration: none; color: #EDEDEF; border-bottom: 1px solid #2C2C32">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EDEDEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M7 9h10M7 13h10M7 17h6"></path></svg>
+<span style="flex: 1; font-size: 16px; font-weight: 500">Todas las notas</span><span style="color: #A0A0AB; font-size: 15px">8</span>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-decoration: none; color: #EDEDEF">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A0A0AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13h4l2 3h4l2-3h4"></path><path d="M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"></path></svg>
+<span style="flex: 1; font-size: 16px; font-weight: 500">Sin colección</span><span style="color: #A0A0AB; font-size: 15px">4</span>
+</a>
+</div>
+
+<section>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 8px 8px">
+<h2 style="margin: 0; font-size: 14px; font-weight: 600; color: #A0A0AB; letter-spacing: 0.04em; text-transform: uppercase">Colecciones</h2>
+<button type="button" style="height: 36px; padding: 0 10px; border: none; background: none; color: #EDEDEF; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EDEDEF" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Nueva</button>
+</div>
+<div style="background: #1C1C20; border-radius: 18px; overflow: hidden">
+<a href="#" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-decoration: none; color: #EDEDEF; border-bottom: 1px solid #2C2C32">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#F06292" stroke="none"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+<span style="flex: 1; font-size: 16px; font-weight: 500">Frases</span><span style="color: #A0A0AB; font-size: 15px">1</span>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-decoration: none; color: #EDEDEF; border-bottom: 1px solid #2C2C32">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#9AA5F2" stroke="none"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+<span style="flex: 1; font-size: 16px; font-weight: 500">Recetas</span><span style="color: #A0A0AB; font-size: 15px">1</span>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-decoration: none; color: #EDEDEF">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#F2C94C" stroke="none"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+<span style="flex: 1; font-size: 16px; font-weight: 500">Rutinas</span><span style="color: #A0A0AB; font-size: 15px">2</span>
+</a>
+</div>
+</section>
+
+<section>
+<h2 style="margin: 0; padding: 0 8px 8px; font-size: 14px; font-weight: 600; color: #A0A0AB; letter-spacing: 0.04em; text-transform: uppercase">Recientes</h2>
+<div style="background: #1C1C20; border-radius: 18px; overflow: hidden">
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: #EDEDEF; border-bottom: 1px solid #2C2C32">
+<span style="width: 8px; height: 8px; border-radius: 4px; background: #F2C94C"></span>
+<span style="flex: 1; font-size: 15px">tabata</span><span style="color: #A0A0AB; font-size: 13px">18:44</span>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: #EDEDEF">
+<span style="width: 8px; height: 8px; border-radius: 4px; background: #9AA5F2"></span>
+<span style="flex: 1; font-size: 15px">Receta Jugo Verde</span><span style="color: #A0A0AB; font-size: 13px">18:43</span>
+</a>
+</div>
+</section>
+</div>
+
+<div style="padding: 12px 20px 24px; background: #121214; border-top: 1px solid #222227">
+<button type="button" style="width: 100%; height: 60px; border-radius: 18px; border: none; background: #EDEDEF; color: #121214; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#121214" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M12 11v6M9 14h6"></path></svg>
+Nueva nota
+</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

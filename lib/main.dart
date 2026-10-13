@@ -45,8 +45,8 @@ class SyncedNotesApp extends StatelessWidget {
         ],
         // Si el sistema está en un idioma que la app no tiene: inglés.
         localeListResolutionCallback: resolveAppLocale,
-        // Sigue el tema claro/oscuro del sistema.
-        themeMode: ThemeMode.system,
+        // Claro, oscuro o el del sistema (se elige en Ajustes).
+        themeMode: settings.themeMode,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: seed),
           useMaterial3: true,

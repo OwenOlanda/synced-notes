@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synced_notes/models/collection_filter.dart';
@@ -67,5 +68,19 @@ void main() {
     }
     expect(CollectionFilter.decode(null), CollectionFilter.all);
     expect(CollectionFilter.decode('basura'), CollectionFilter.all);
+  });
+
+  test('el tema: del sistema por defecto, y se recuerda el elegido', () async {
+    final settings = await AppSettings.load();
+    expect(settings.themeMode, ThemeMode.system);
+
+    await settings.setThemeMode(ThemeMode.dark);
+    expect((await AppSettings.load()).themeMode, ThemeMode.dark);
+
+    await settings.setThemeMode(ThemeMode.light);
+    expect((await AppSettings.load()).themeMode, ThemeMode.light);
+
+    await settings.setThemeMode(ThemeMode.system);
+    expect((await AppSettings.load()).themeMode, ThemeMode.system);
   });
 }

@@ -1,0 +1,31 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-13T01:40:00Z"},
+  "title": "Synced Notes — Propuestas de interfaz",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "A · Lista compacta"},
+    "PropuestaB.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "B · Tarjetas"},
+    "PropuestaC.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "C · Colecciones primero"},
+    "Seleccion.dc.html": {"x": 0, "y": 1244, "w": 390, "h": 844, "title": "Selección múltiple (mantener presionado)"},
+    "SelectorColecciones.dc.html": {"x": 470, "y": 1244, "w": 390, "h": 844, "title": "Muchas colecciones: selector con búsqueda"},
+    "ClaroA.dc.html": {"x": 940, "y": 1244, "w": 390, "h": 844, "title": "A en tema claro"},
+    "Escritorio.dc.html": {"x": 0, "y": 2488, "w": 1280, "h": 800, "title": "PC · Panel lateral + lista + editor", "expand": "fill"}
+  },
+  "order": [
+    "Main.dc.html",
+    "PropuestaB.dc.html",
+    "PropuestaC.dc.html",
+    "Seleccion.dc.html",
+    "SelectorColecciones.dc.html",
+    "ClaroA.dc.html",
+    "Escritorio.dc.html"
+  ],
+  "notes": {
+    "fila1": {"x": 0, "y": -300, "text": "Pantalla principal en celular: 3 propuestas", "kind": "title1", "maxW": 1330},
+    "fila2": {"x": 0, "y": 944, "text": "Selección, muchas colecciones y tema claro", "kind": "title1", "maxW": 1330},
+    "fila3": {"x": 0, "y": 2188, "text": "PC: estilo explorador de archivos", "kind": "title1", "maxW": 1280}
+  },
+  "designSystems": []
+}

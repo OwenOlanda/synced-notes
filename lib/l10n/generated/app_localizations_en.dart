@@ -355,4 +355,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String newNoteIn(String name) {
     return 'New note in \"$name\"';
   }
+
+  @override
+  String get themeTitle => 'Theme';
+
+  @override
+  String get themeSystem => 'System default';
+
+  @override
+  String themeSystemWithCurrent(String theme) {
+    return 'System default ($theme)';
+  }
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
 }

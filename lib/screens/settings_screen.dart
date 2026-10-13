@@ -65,6 +65,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .setLanguageCode(choice == _systemLanguage ? null : choice);
   }
 
+  Future<void> _chooseTheme() async {
+    final l10n = context.l10n;
+    final current = widget.settings.themeMode;
+
+    Widget option(ThemeMode value, String label, IconData icon) => ListTile(
+          leading: Icon(icon),
+          title: Text(label),
+          trailing: value == current ? const Icon(Icons.check) : null,
+          onTap: () => Navigator.of(context).pop(value),
+        );
+
+    final choice = await showDialog<ThemeMode>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(l10n.themeTitle),
+        children: [
+          option(ThemeMode.system, l10n.themeSystem,
+              Icons.brightness_auto_outlined),
+          option(ThemeMode.light, l10n.themeLight, Icons.light_mode_outlined),
+          option(ThemeMode.dark, l10n.themeDark, Icons.dark_mode_outlined),
+        ],
+      ),
+    );
+    if (choice != null) await widget.settings.setThemeMode(choice);
+  }
+
+  /// Texto del tema actual, ej. "Del sistema (Oscuro)" o "Claro".
+  String _currentThemeLabel(AppLocalizations l10n) {
+    switch (widget.settings.themeMode) {
+      case ThemeMode.light:
+        return l10n.themeLight;
+      case ThemeMode.dark:
+        return l10n.themeDark;
+      case ThemeMode.system:
+        final dark =
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+        return l10n
+            .themeSystemWithCurrent(dark ? l10n.themeDark : l10n.themeLight);
+    }
+  }
+
   /// Texto del idioma actual, ej. "Idioma del sistema (English)" o "Español".
   String _currentLanguageLabel(AppLocalizations l10n) {
     final chosen = localeForLanguageCode(widget.settings.languageCode);
@@ -121,6 +162,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(l10n.languageTitle),
               subtitle: Text(_currentLanguageLabel(l10n)),
               onTap: _chooseLanguage,
+            ),
+          ),
+          ListenableBuilder(
+            listenable: widget.settings,
+            builder: (context, _) => ListTile(
+              leading: const Icon(Icons.brightness_6_outlined),
+              title: Text(l10n.themeTitle),
+              subtitle: Text(_currentThemeLabel(l10n)),
+              onTap: _chooseTheme,
             ),
           ),
           const Divider(),

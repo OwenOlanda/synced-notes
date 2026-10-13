@@ -97,5 +97,10 @@
   "newCollectionEllipsis": "Nueva colección…",
   "noteMovedTo": "Nota movida a \"{name}\"",
   "noteMovedToNone": "Nota movida a \"Sin colección\"",
-  "newNoteIn": "Nueva nota en \"{name}\""
+  "newNoteIn": "Nueva nota en \"{name}\"",
+  "themeTitle": "Tema",
+  "themeSystem": "Del sistema",
+  "themeSystemWithCurrent": "Del sistema ({theme})",
+  "themeLight": "Claro",
+  "themeDark": "Oscuro"
 }
