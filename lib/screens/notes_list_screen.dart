@@ -7,6 +7,7 @@ import '../models/group_filter.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
+import '../utils/note_search.dart';
 import '../widgets/app_message.dart';
 import '../widgets/group_colors.dart';
 import '../widgets/group_dialogs.dart';
@@ -74,10 +75,138 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// más tiene el foco.
   final FocusNode _shortcutsFocus = FocusNode(debugLabel: 'atajos de la lista');
 
+  // Búsqueda ------------------------------------------------------------------
+
+  /// Lo que se escribió en el buscador.
+  final TextEditingController _searchText = TextEditingController();
+  final FocusNode _searchFocus = FocusNode(debugLabel: 'buscador');
+
+  /// Celular: la barra de arriba está en modo búsqueda.
+  bool _searchOpen = false;
+
+  /// Buscar en todas las notas aunque se esté viendo un grupo.
+  bool _searchAll = false;
+
+  NoteSearch get _search => NoteSearch(_searchText.text);
+
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_keepShortcutsListening);
     _shortcutsFocus.dispose();
+    _searchText.dispose();
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _openSearch() {
+    setState(() => _searchOpen = true);
+    _searchFocus.requestFocus();
+  }
+
+  void _closeSearch() {
+    _searchText.clear();
+    setState(() {
+      _searchOpen = false;
+      _searchAll = false;
+    });
+    _shortcutsFocus.requestFocus();
+  }
+
+  /// Las notas que se ven: las de lo que se está viendo y, si hay una
+  /// búsqueda, solo las que coinciden (primero las que coinciden en el
+  /// título). Con "Buscar en todas", la búsqueda ignora el grupo.
+  List<Note> _visibleNotes() {
+    final all = _notes ?? const <Note>[];
+    final search = _search;
+    if (search.isEmpty) return all.where(_filter.matches).toList();
+    final scoped = _searchAll ? all : all.where(_filter.matches);
+    final found = scoped.where(search.matches).toList();
+    return [
+      ...found.where(search.matchesTitle),
+      ...found.where((n) => !search.matchesTitle(n)),
+    ];
+  }
+
+  /// "Buscando en Recetas  [Buscar en todas]" (o al revés).
+  Widget _buildSearchScope(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodySmall
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final here = _viewLabel(l10n);
+    final everywhere = _filter.isAll || _searchAll;
+    return Row(
+      children: [
+        Flexible(
+          child: Text(
+            everywhere ? l10n.searchingAll : l10n.searchingIn(here),
+            key: const ValueKey('search-scope'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
+        if (!_filter.isAll)
+          TextButton(
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            onPressed: () => setState(() => _searchAll = !_searchAll),
+            child: Text(_searchAll
+                ? l10n.searchOnlyIn(here)
+                : l10n.searchAllInstead),
+          ),
+      ],
+    );
+  }
+
+  /// El campo de búsqueda (en la barra del celular o arriba de la lista
+  /// en PC). Esc: si hay texto, lo borra; si no, cierra la búsqueda.
+  Widget _buildSearchField(BuildContext context, {required bool wide}) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final field = TextField(
+      key: const ValueKey('search-field'),
+      controller: _searchText,
+      focusNode: _searchFocus,
+      textInputAction: TextInputAction.search,
+      style: wide ? theme.textTheme.bodyMedium : theme.textTheme.titleMedium,
+      decoration: InputDecoration(
+        hintText: wide ? '${l10n.searchNotes} (Ctrl+F)' : l10n.searchNotes,
+        isDense: wide,
+        filled: wide,
+        fillColor: theme.colorScheme.surfaceContainerHighest,
+        prefixIcon: wide ? const Icon(Icons.search, size: 20) : null,
+        suffixIcon: _searchText.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: l10n.clearSearch,
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: _searchText.clear,
+              ),
+        border: wide
+            ? OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              )
+            : InputBorder.none,
+      ),
+    );
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (_searchText.text.isNotEmpty) {
+            _searchText.clear();
+          } else if (wide) {
+            _shortcutsFocus.requestFocus();
+          } else {
+            _closeSearch();
+          }
+        },
+      },
+      child: field,
+    );
   }
 
   /// Lo que se está viendo. Se recuerda en los ajustes.
@@ -86,7 +215,29 @@ class _NotesListScreenState extends State<NotesListScreen> {
   @override
   void initState() {
     super.initState();
+    _searchText.addListener(() => setState(() {}));
+    FocusManager.instance.addListener(_keepShortcutsListening);
     _load();
+  }
+
+  /// Al hacer clic en un área vacía después de escribir en un campo, el
+  /// campo suelta el foco y Flutter lo deja en el "fondo" de la pantalla
+  /// (el FocusScope de la ruta), que está por encima de los atajos: Ctrl+F,
+  /// Ctrl+N, etc. dejaban de funcionar. Aquí el foco regresa a los atajos.
+  void _keepShortcutsListening() {
+    final primary = FocusManager.instance.primaryFocus;
+    if (!mounted ||
+        primary == null ||
+        primary == _shortcutsFocus ||
+        primary is! FocusScopeNode ||
+        !_shortcutsFocus.canRequestFocus) {
+      return;
+    }
+    // Solo si ese "fondo" es el de esta pantalla (no el de un diálogo o el
+    // de otra pantalla encima).
+    if (_shortcutsFocus.ancestors.contains(primary)) {
+      _shortcutsFocus.requestFocus();
+    }
   }
 
   @override
@@ -120,6 +271,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
   }
 
   Future<void> _select(GroupFilter filter) async {
+    _searchAll = false; // la búsqueda vuelve a ser "en lo que se ve"
     await widget.settings.setSelectedGroup(filter);
     if (mounted) setState(() {});
   }
@@ -453,6 +605,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
             control: true, shift: true): () {
           if (loaded) _createGroup();
         },
+        // Ctrl+F: buscar.
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () {
+          if (!loaded) return;
+          if (_isWide) {
+            _searchFocus.requestFocus();
+          } else {
+            _openSearch();
+          }
+        },
         // Esc: cerrar la nota abierta en la columna del editor (si el foco
         // está dentro del editor, el propio editor atiende el Esc).
         const SingleActivator(LogicalKeyboardKey.escape): () =>
@@ -490,10 +651,19 @@ class _NotesListScreenState extends State<NotesListScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildNarrow(BuildContext context, {required bool loaded}) {
+    final searching =
+        loaded && (_searchOpen || _searchText.text.isNotEmpty);
+    if (searching) return _buildNarrowSearch(context);
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final visible = (_notes ?? const <Note>[]).where(_filter.matches).length;
+    final visible = _visibleNotes().length;
     return Scaffold(
+      // El teclado no encoge esta pantalla: aquí solo lo abre el buscador
+      // del panel de grupos, que queda arriba, a la vista. Si la pantalla se
+      // encogiera, el panel calcularía su tamaño "cerrado" con el alto
+      // pequeño y, al irse el teclado, quedaba cerrado a medias (y se hacía
+      // más alto al tocar su buscador).
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         titleSpacing: 20,
         // Nombre de la app: no se traduce.
@@ -505,8 +675,13 @@ class _NotesListScreenState extends State<NotesListScreen> {
           ),
         ),
         actions: [
+          if (loaded)
+            IconButton(
+              tooltip: l10n.searchNotes,
+              icon: const Icon(Icons.search),
+              onPressed: _openSearch,
+            ),
           // Por si cambiaste archivos desde el explorador con la app abierta.
-          // (La lupa de buscar llega en la fase "Organizar y buscar".)
           IconButton(
             tooltip: l10n.refreshList,
             icon: const Icon(Icons.refresh),
@@ -571,6 +746,38 @@ class _NotesListScreenState extends State<NotesListScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  /// Celular buscando: la barra de arriba es el buscador (con flecha para
+  /// salir) y, debajo, dónde se busca. Mientras, sin panel de grupos ni
+  /// "Nueva nota": la pantalla es solo para los resultados.
+  Widget _buildNarrowSearch(BuildContext context) {
+    final l10n = context.l10n;
+    return PopScope(
+      canPop: false, // Atrás primero sale de la búsqueda
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _closeSearch();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            tooltip: l10n.closeSearch,
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _closeSearch,
+          ),
+          titleSpacing: 0,
+          title: _buildSearchField(context, wide: false),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(36),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 12, 4),
+              child: _buildSearchScope(context),
+            ),
+          ),
+        ),
+        body: _buildBody(context, bottomSpace: 24),
+      ),
     );
   }
 
@@ -741,14 +948,17 @@ class _NotesListScreenState extends State<NotesListScreen> {
   Widget _buildWideHeader(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final visible = _notes!.where(_filter.matches).length;
+    final visible = _visibleNotes().length;
     final background = _newNoteColor(theme);
     return SafeArea(
       bottom: false,
       left: false,
       child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 16, 12),
-        child: Row(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+        Row(
           children: [
             Expanded(
               child: Column(
@@ -793,6 +1003,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
             ),
           ],
         ),
+            const SizedBox(height: 12),
+            _buildSearchField(context, wide: true),
+            if (!_search.isEmpty)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 4, top: 2),
+                child: _buildSearchScope(context),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -832,13 +1051,18 @@ class _NotesListScreenState extends State<NotesListScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final notes = allNotes.where(_filter.matches).toList();
+    final search = _search;
+    final notes = _visibleNotes();
     if (notes.isEmpty) {
       return Center(
         child: Padding(
           padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomSpace / 2),
           child: Text(
-            allNotes.isEmpty ? l10n.emptyNotes : l10n.emptyFilter,
+            !search.isEmpty
+                ? l10n.noSearchResults(_searchText.text.trim())
+                : allNotes.isEmpty
+                    ? l10n.emptyNotes
+                    : l10n.emptyFilter,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyLarge
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -847,7 +1071,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
       );
     }
 
-    final showGroup = _filter.isAll;
+    // El grupo de cada nota se muestra cuando la lista mezcla grupos.
+    final showGroup = _filter.isAll || (!search.isEmpty && _searchAll);
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(8, 4, 8, bottomSpace),
       itemCount: notes.length,
@@ -859,6 +1084,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
           groupColor: group == null ? null : _colorOf(group, theme),
           showGroup: showGroup,
           selected: _isOpenInPane(note),
+          search: search.isEmpty ? null : search,
           onTap: () => _open(note),
           onMenu: (position) => _showNoteMenu(note, position),
         );

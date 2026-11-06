@@ -775,6 +775,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New note in'**
   String get newNoteInPrefix;
+
+  /// Hint of the search field and tooltip of the search (magnifier) button.
+  ///
+  /// In en, this message translates to:
+  /// **'Search notes'**
+  String get searchNotes;
+
+  /// Tooltip of the back arrow that leaves search mode (phone view).
+  ///
+  /// In en, this message translates to:
+  /// **'Close search'**
+  String get closeSearch;
+
+  /// Tooltip of the X that empties the search field.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clearSearch;
+
+  /// Says where the search looks: only in the group being viewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching in {name}'**
+  String searchingIn(String name);
+
+  /// Says the search looks in every note.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching all notes'**
+  String get searchingAll;
+
+  /// Button: search in every note instead of only the group being viewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Search all'**
+  String get searchAllInstead;
+
+  /// Button: go back to searching only in the group being viewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Only in {name}'**
+  String searchOnlyIn(String name);
+
+  /// Shown when the search finds nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No notes match \"{query}\"'**
+  String noSearchResults(String query);
 }
 
 class _AppLocalizationsDelegate

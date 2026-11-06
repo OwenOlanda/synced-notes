@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderProxyBox;
 
 import '../models/note_group.dart';
 
@@ -19,6 +20,46 @@ Color displayColor(GroupColor color, Brightness brightness) {
     GroupColor.grey => Colors.blueGrey,
   };
   return brightness == Brightness.dark ? base.shade300 : base.shade600;
+}
+
+/// Carpetita rellena del color de un grupo. Es la marca del grupo en toda
+/// la app (lista, chips, panel y barra lateral): el nombre va en gris y el
+/// color lo pone la carpeta. `null` = grupo sin color (carpeta gris).
+class GroupFolderIcon extends StatelessWidget {
+  const GroupFolderIcon(this.color, {super.key, this.size = 16});
+
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => _NoBaseline(
+        child: Icon(
+          Icons.folder,
+          size: size,
+          color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      );
+}
+
+/// Oculta la línea base de su hijo. Un ícono es texto por dentro y tiene
+/// línea base; en una fila alineada por línea base (o centrada junto a un
+/// texto) eso lo subía. Sin línea base, la carpetita se centra con el texto.
+class _NoBaseline extends SingleChildRenderObjectWidget {
+  const _NoBaseline({super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderNoBaseline();
+}
+
+class _RenderNoBaseline extends RenderProxyBox {
+  @override
+  double? computeDistanceToActualBaseline(TextBaseline baseline) => null;
+
+  @override
+  double? computeDryBaseline(
+          BoxConstraints constraints, TextBaseline baseline) =>
+      null;
 }
 
 /// Puntito de color de un grupo. Sin color: un círculo vacío.

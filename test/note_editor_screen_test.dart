@@ -48,7 +48,7 @@ void main() {
         findsOneWidget);
 
     // El aviso se quita solo.
-    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(seconds: 7));
     expect(find.textContaining('no puede contener'), findsNothing);
   });
 
@@ -66,7 +66,7 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'a?b');
     await tester.pump();
     expect(find.textContaining("can't contain"), findsOneWidget);
-    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(seconds: 7));
   });
 
   testWidgets('mover la nota desde el menú ⋮', (tester) async {

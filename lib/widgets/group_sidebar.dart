@@ -18,7 +18,8 @@ import 'group_panel.dart' show GroupAction;
 ///   …
 ///   ⚙ Ajustes
 ///
-/// Los grupos llevan su nombre en su color (igual que en el celular). Cada
+/// Los grupos llevan su carpetita de color y el nombre en color neutro
+/// (igual que en el celular). Cada
 /// grupo tiene ⋮ (al pasar el mouse) y clic derecho con Renombrar, Color y
 /// Borrar.
 class GroupSidebar extends StatelessWidget {
@@ -66,11 +67,13 @@ class GroupSidebar extends StatelessWidget {
       required GroupFilter filter,
       required int notes,
       Color? color,
+      Color? folderColor,
       NoteGroup? group,
     }) =>
         _SidebarItem(
           label: label,
           color: color,
+          folderColor: folderColor,
           count: notes,
           selected: filter == selected,
           onTap: () => onSelect(filter),
@@ -157,8 +160,9 @@ class GroupSidebar extends StatelessWidget {
                         label: group.name,
                         filter: GroupFilter.group(group.name),
                         notes: counts[group.name] ?? 0,
-                        color: group.color == null
-                            ? null
+                        // Grupo sin color: carpeta gris.
+                        folderColor: group.color == null
+                            ? scheme.onSurfaceVariant
                             : displayColor(group.color!, theme.brightness),
                         group: group,
                       ),
@@ -191,6 +195,7 @@ class _SidebarItem extends StatefulWidget {
     required this.selected,
     required this.onTap,
     this.color,
+    this.folderColor,
     this.count,
     this.icon,
     this.onAction,
@@ -200,6 +205,9 @@ class _SidebarItem extends StatefulWidget {
   final bool selected;
   final VoidCallback onTap;
   final Color? color;
+
+  /// Carpetita del color del grupo. `null` = no es un grupo.
+  final Color? folderColor;
   final int? count;
   final IconData? icon;
 
@@ -265,9 +273,11 @@ class _SidebarItemState extends State<_SidebarItem> {
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             selected: widget.selected,
             selectedTileColor: scheme.secondaryContainer,
-            leading: widget.icon == null
-                ? null
-                : Icon(widget.icon, size: 20, color: textColor),
+            leading: widget.folderColor != null
+                ? GroupFolderIcon(widget.folderColor, size: 18)
+                : widget.icon == null
+                    ? null
+                    : Icon(widget.icon, size: 20, color: textColor),
             minLeadingWidth: 0,
             horizontalTitleGap: 10,
             title: Text(
@@ -276,9 +286,7 @@ class _SidebarItemState extends State<_SidebarItem> {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: textColor,
-                fontWeight: widget.color != null && widget.onAction != null
-                    ? FontWeight.w600
-                    : FontWeight.w500,
+                fontWeight: FontWeight.w500,
               ),
             ),
             trailing: Row(

@@ -29,7 +29,7 @@ class BlockedCharsFormatter extends TextInputFormatter {
 /// Aviso temporal: se muestra y se quita solo después de [duration].
 /// Para el mensaje de "ese carácter no se permite".
 class TemporaryHint {
-  TemporaryHint(this._onChange, {this.duration = const Duration(seconds: 3)});
+  TemporaryHint(this._onChange, {this.duration = const Duration(seconds: 6)});
 
   final VoidCallback _onChange;
   final Duration duration;

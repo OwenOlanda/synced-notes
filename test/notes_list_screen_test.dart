@@ -9,6 +9,7 @@ import 'package:synced_notes/models/note_group.dart';
 import 'package:synced_notes/screens/note_editor_screen.dart';
 import 'package:synced_notes/screens/notes_list_screen.dart';
 import 'package:synced_notes/services/app_settings.dart';
+import 'package:synced_notes/widgets/group_colors.dart';
 import 'package:synced_notes/widgets/group_panel.dart';
 import 'package:synced_notes/widgets/group_sidebar.dart';
 import 'package:synced_notes/widgets/note_row.dart';
@@ -47,6 +48,9 @@ final groupLabels = find.byKey(const ValueKey('note-group-label'));
 
 /// Barritas de color del grupo en las filas de notas.
 final groupBars = find.byKey(const ValueKey('note-group-bar'));
+
+/// Carpetitas de color junto al nombre del grupo en las filas de notas.
+final groupFolders = find.byKey(const ValueKey('note-group-folder'));
 
 void main() {
   late AppSettings settings;
@@ -305,13 +309,126 @@ void main() {
       await showList(tester, notes: notes, groups: groups);
       expect(groupBars, findsNWidgets(2)); // Tacos y la carta
       expect(groupLabels, findsNWidgets(2));
+      expect(groupFolders, findsNWidgets(2));
 
       await choose(tester, 'Recetas');
       expect(groupBars, findsNothing);
       expect(groupLabels, findsNothing);
+      expect(groupFolders, findsNothing);
 
       await choose(tester, 'Sin grupo');
       expect(groupBars, findsNothing);
+    });
+
+    testWidgets('el nombre del grupo va en gris y la carpetita lleva el color',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      final theme = Theme.of(tester.element(groupLabels.first));
+      final orange = displayColor(GroupColor.orange, theme.brightness);
+
+      final tacos = find.ancestor(
+          of: find.text('Tacos'), matching: find.byType(NoteRow));
+      final label = tester.widget<Text>(
+          find.descendant(of: tacos, matching: groupLabels));
+      expect(label.data, 'Recetas');
+      expect(label.style?.color, theme.colorScheme.onSurfaceVariant);
+      final folder = tester.widget<GroupFolderIcon>(
+          find.descendant(of: tacos, matching: groupFolders));
+      expect(folder.color, orange);
+      // La carpetita va centrada en vertical con el nombre.
+      expect(
+          tester.getCenter(find.descendant(of: tacos, matching: groupFolders)).dy,
+          moreOrLessEquals(
+              tester
+                  .getCenter(find.descendant(of: tacos, matching: groupLabels))
+                  .dy,
+              epsilon: 0.5));
+      // La carpetita va a la derecha del nombre.
+      expect(
+          tester.getCenter(find.descendant(of: tacos, matching: groupFolders)).dx,
+          greaterThan(tester
+              .getCenter(find.descendant(of: tacos, matching: groupLabels))
+              .dx));
+    });
+
+    testWidgets('los chips de grupo llevan su carpetita; Todas no',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      final theme = Theme.of(tester.element(chipOf('Recetas')));
+      expect(tester.widget<GroupChip>(chipOf('Todas')).folderColor, isNull);
+      expect(tester.widget<GroupChip>(chipOf('Recetas')).folderColor,
+          displayColor(GroupColor.orange, theme.brightness));
+      // Grupo sin color: carpeta gris.
+      expect(tester.widget<GroupChip>(chipOf('Cartas')).folderColor,
+          theme.colorScheme.onSurfaceVariant);
+      expect(
+          find.descendant(
+              of: chipOf('Recetas'), matching: find.byType(GroupFolderIcon)),
+          findsOneWidget);
+    });
+
+    testWidgets('con el teclado abierto, elegir un grupo cierra el panel del todo',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      final closed = tester.getTopLeft(find.text('Grupos de notas'));
+      await openPanel(tester);
+
+      // Se abre el teclado (buscar un grupo en el panel) y se elige uno.
+      tester.view.viewInsets = FakeViewPadding(
+          bottom: 300 * tester.view.devicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      // El panel no cambia de alto por el teclado.
+      await tester.tap(tileOf('Recetas'));
+      await tester.pumpAndSettle();
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+
+      expect(scrim, findsNothing);
+      expect(tester.getTopLeft(find.text('Grupos de notas')), closed);
+    });
+
+    testWidgets('el teclado no hace más alto el panel abierto',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await openPanel(tester);
+      final open = tester.getTopLeft(find.text('Grupos de notas'));
+
+      tester.view.viewInsets = FakeViewPadding(
+          bottom: 300 * tester.view.devicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.text('Grupos de notas')), open);
+    });
+
+    testWidgets('cerrar el panel arrastrándolo esconde el teclado del buscador',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await openPanel(tester);
+      final field = find.descendant(
+          of: find.byType(GroupPanel), matching: find.byType(TextField));
+      await tester.tap(field);
+      await tester.pump();
+      // Se guarda ahora: cerrado, el buscador queda fuera de la pantalla y
+      // el buscador de las pruebas ya no lo encuentra.
+      final focus = tester.widget<TextField>(field).focusNode!;
+      expect(focus.hasFocus, isTrue);
+
+      // Bajarlo con el dedo hasta cerrarlo (sin tocar fuera).
+      await tester.drag(find.text('Grupos de notas'), const Offset(0, 600));
+      await tester.pumpAndSettle();
+      expect(scrim, findsNothing);
+      expect(focus.hasFocus, isFalse);
+    });
+
+    testWidgets('subir el panel un poco, despacio, basta para abrirlo',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      // Menos de la mitad del recorrido y lento (sin "lanzarlo").
+      await tester.timedDrag(find.text('Grupos de notas'),
+          const Offset(0, -120), const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(scrim, findsOneWidget);
     });
 
     testWidgets('crear un grupo con el botón del panel y quedar dentro',
@@ -344,7 +461,7 @@ void main() {
       expect(find.textContaining('no puede contener'), findsOneWidget);
 
       // El aviso se quita solo.
-      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(seconds: 7));
       expect(find.textContaining('no puede contener'), findsNothing);
     });
 
@@ -450,6 +567,111 @@ void main() {
 
       await choose(tester, 'Recetas');
       expect(find.byTooltip('Nueva nota en "Recetas"'), findsOneWidget);
+    });
+  });
+
+  group('búsqueda', () {
+    final notes = [
+      _note(title: 'Suelta', content: 'Leche y pan'),
+      _note(title: 'Tacos', content: 'Tortillas, carne y salsa', group: 'Recetas'),
+      _note(title: 'Querida tía', group: 'Cartas'),
+    ];
+    const groups = [
+      NoteGroup(name: 'Recetas', color: GroupColor.orange),
+      NoteGroup(name: 'Cartas'),
+    ];
+    final searchField = find.byKey(const ValueKey('search-field'));
+    final scope = find.byKey(const ValueKey('search-scope'));
+
+    Future<void> search(WidgetTester tester, String text) async {
+      await tester.enterText(searchField, text);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('la lupa busca en título y texto', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Buscando en todas las notas'), findsOneWidget);
+
+      await search(tester, 'salsa'); // está en el texto de Tacos
+      expect(find.text('Tacos'), findsOneWidget);
+      expect(find.text('Suelta'), findsNothing);
+      // Mientras se busca no estorban el panel ni "Nueva nota".
+      expect(find.byType(GroupPanel), findsNothing);
+    });
+
+    testWidgets('sin importar acentos ni mayúsculas; varias palabras',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+
+      await search(tester, 'QUERIDA TIA');
+      expect(find.text('Querida tía'), findsOneWidget);
+      expect(find.text('Tacos'), findsNothing);
+
+      await search(tester, 'leche pan');
+      expect(find.text('Suelta'), findsOneWidget);
+      await search(tester, 'leche carne');
+      expect(find.text('Ninguna nota coincide con "leche carne"'),
+          findsOneWidget);
+    });
+
+    testWidgets('dentro de un grupo busca ahí, y se puede buscar en todas',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await choose(tester, 'Recetas');
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(scope).data, 'Buscando en Recetas');
+
+      await search(tester, 'tia');
+      expect(find.text('Ninguna nota coincide con "tia"'), findsOneWidget);
+
+      await tester.tap(find.text('Buscar en todas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Querida tía'), findsOneWidget);
+      expect(tester.widget<Text>(scope).data, 'Buscando en todas las notas');
+      expect(find.text('Solo en Recetas'), findsOneWidget);
+    });
+
+    testWidgets('la flecha cierra la búsqueda y vuelve la lista completa',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      await search(tester, 'salsa');
+
+      await tester.tap(find.byTooltip('Cerrar búsqueda'));
+      await tester.pumpAndSettle();
+      expect(searchField, findsNothing);
+      expect(find.text('Suelta'), findsOneWidget);
+      expect(find.text('Tacos'), findsOneWidget);
+      expect(find.byType(GroupPanel), findsOneWidget);
+    });
+
+    testWidgets('en PC: Ctrl+F lleva al buscador y filtra la lista',
+        (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await showList(tester, notes: notes, groups: groups);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      expect(tester.widget<TextField>(searchField).focusNode!.hasFocus, isTrue);
+
+      await search(tester, 'suelta');
+      expect(find.text('Suelta'), findsOneWidget);
+      expect(find.text('Tacos'), findsNothing);
+
+      // Esc borra lo escrito.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('Tacos'), findsOneWidget);
     });
   });
 
@@ -657,6 +879,32 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pumpAndSettle();
     }
+
+    testWidgets('los atajos siguen funcionando después de que un campo suelta el foco',
+        (tester) async {
+      useWideWindow(tester);
+      await showList(tester, notes: notes, groups: groups);
+      final searchField = find.byKey(const ValueKey('search-field'));
+
+      // Escribir en el buscador y luego hacer clic en un área vacía: el
+      // campo suelta el foco (como lo hace al tocar fuera de él).
+      await tester.tap(searchField);
+      await tester.enterText(searchField, 'x');
+      await tester.pump();
+      FocusManager.instance.primaryFocus!.unfocus();
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(searchField).focusNode!.hasFocus,
+          isFalse);
+
+      await ctrl(tester, LogicalKeyboardKey.keyF);
+      expect(tester.widget<TextField>(searchField).focusNode!.hasFocus,
+          isTrue);
+
+      FocusManager.instance.primaryFocus!.unfocus();
+      await tester.pumpAndSettle();
+      await ctrl(tester, LogicalKeyboardKey.keyN);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+    });
 
     testWidgets('Ctrl+N abre una nota nueva y Esc la cierra', (tester) async {
       useWideWindow(tester);

@@ -112,5 +112,13 @@
   "listSummary": "{view} · {notes}",
   "closeNote": "Cerrar nota",
   "noNoteOpen": "Elige una nota de la lista\no crea una nueva.",
-  "newNoteInPrefix": "Nueva nota en"
+  "newNoteInPrefix": "Nueva nota en",
+  "searchNotes": "Buscar notas",
+  "closeSearch": "Cerrar búsqueda",
+  "clearSearch": "Borrar búsqueda",
+  "searchingIn": "Buscando en {name}",
+  "searchingAll": "Buscando en todas las notas",
+  "searchAllInstead": "Buscar en todas",
+  "searchOnlyIn": "Solo en {name}",
+  "noSearchResults": "Ninguna nota coincide con \"{query}\""
 }

@@ -414,4 +414,34 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get newNoteInPrefix => 'Nueva nota en';
+
+  @override
+  String get searchNotes => 'Buscar notas';
+
+  @override
+  String get closeSearch => 'Cerrar búsqueda';
+
+  @override
+  String get clearSearch => 'Borrar búsqueda';
+
+  @override
+  String searchingIn(String name) {
+    return 'Buscando en $name';
+  }
+
+  @override
+  String get searchingAll => 'Buscando en todas las notas';
+
+  @override
+  String get searchAllInstead => 'Buscar en todas';
+
+  @override
+  String searchOnlyIn(String name) {
+    return 'Solo en $name';
+  }
+
+  @override
+  String noSearchResults(String query) {
+    return 'Ninguna nota coincide con \"$query\"';
+  }
 }

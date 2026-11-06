@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart'
+    show DeviceGestureSettings, VerticalDragGestureRecognizer;
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
 import '../l10n/l10n.dart';
@@ -66,6 +68,7 @@ class GroupPanel extends StatefulWidget {
 class _GroupPanelState extends State<GroupPanel> {
   final DraggableScrollableController _sheet = DraggableScrollableController();
   final TextEditingController _search = TextEditingController();
+  final FocusNode _searchFocus = FocusNode(debugLabel: 'buscar grupos');
   /// Una llave fija por chip (por lo que muestra), para encontrar el chip
   /// elegido. Antes había una sola llave que pasaba de un chip a otro, y el
   /// chip recién elegido arrancaba con el color del anterior por un instante.
@@ -77,6 +80,10 @@ class _GroupPanelState extends State<GroupPanel> {
 
   static const double _maxSize = 0.88;
   static const Duration _animation = Duration(milliseconds: 300);
+
+  /// Cuánto debe moverse el dedo hacia arriba o abajo para que el panel
+  /// tome el arrastre (la fila de chips necesita 18 px de lado).
+  static const double _verticalSlop = 8;
 
   double _minSize = 0.2;
 
@@ -109,6 +116,7 @@ class _GroupPanelState extends State<GroupPanel> {
   void dispose() {
     _sheet.dispose();
     _search.dispose();
+    _searchFocus.dispose();
     _openness.dispose();
     _chips.dispose();
     super.dispose();
@@ -157,6 +165,13 @@ class _GroupPanelState extends State<GroupPanel> {
   // termina de abrirse o cerrarse según la velocidad o qué tan abierto quedó.
   // (Se maneja aquí y no con el desplazamiento de la lista para que siempre
   // responda igual, aunque la lista de grupos esté desplazada.)
+  /// Qué tan abierto estaba el panel al empezar a arrastrarlo.
+  double _dragStartSize = 0;
+
+  void _onDragStart(DragStartDetails details) {
+    if (_sheet.isAttached) _dragStartSize = _sheet.size;
+  }
+
   void _onDragUpdate(DragUpdateDetails details) {
     if (!_sheet.isAttached) return;
     final size =
@@ -167,14 +182,20 @@ class _GroupPanelState extends State<GroupPanel> {
   void _onDragEnd(DragEndDetails details) {
     if (!_sheet.isAttached) return;
     final velocity = details.primaryVelocity ?? 0; // positiva = hacia abajo
-    if (velocity < -300) {
+    final range = _maxSize - _minSize;
+    final progress = range <= 0 ? 0.0 : (_sheet.size - _minSize) / range;
+    final startedOpen = _dragStartSize - _minSize > range / 2;
+    if (velocity < -200) {
       _open();
-    } else if (velocity > 300) {
+    } else if (velocity > 200) {
       _close();
-    } else if (_sheet.size - _minSize > _maxSize - _sheet.size) {
-      _open();
+    } else if (startedOpen) {
+      // Abierto: basta bajarlo un poco (20%) para cerrarlo.
+      progress < 0.8 ? _close() : _open();
     } else {
-      _close();
+      // Cerrado: basta subirlo un poco (20%) para abrirlo. Antes había que
+      // pasar de la mitad y a veces parecía que "no se abría".
+      progress > 0.2 ? _open() : _close();
     }
   }
 
@@ -189,7 +210,16 @@ class _GroupPanelState extends State<GroupPanel> {
         range <= 0 ? 0.0 : ((n.extent - n.minExtent) / range).clamp(0.0, 1.0);
     _openness.value = openness;
     final isOpen = openness > 0.01;
-    if (isOpen != _isOpen) setState(() => _isOpen = isOpen);
+    if (isOpen != _isOpen) {
+      // Se cerró (también arrastrándolo hacia abajo o desplazando la lista
+      // de grupos): el teclado del buscador se esconde y la búsqueda se
+      // borra, igual que al cerrarlo tocando.
+      if (!isOpen) {
+        _searchFocus.unfocus();
+        _search.clear();
+      }
+      setState(() => _isOpen = isOpen);
+    }
     return false;
   }
 
@@ -256,6 +286,10 @@ class _GroupPanelState extends State<GroupPanel> {
     Color colorOf(NoteGroup group) => group.color == null
         ? scheme.onSurface
         : displayColor(group.color!, theme.brightness);
+    // La carpetita de un grupo sin color va en gris.
+    Color folderOf(NoteGroup group) => group.color == null
+        ? scheme.onSurfaceVariant
+        : displayColor(group.color!, theme.brightness);
 
     return Material(
       color: scheme.surfaceContainer,
@@ -268,14 +302,29 @@ class _GroupPanelState extends State<GroupPanel> {
         controller: scroll,
         slivers: [
           SliverToBoxAdapter(
-            child: GestureDetector(
+            // Arrastre vertical con un umbral más corto que el de la fila de
+            // chips (que se desliza de lado): si el dedo va en diagonal, el
+            // panel gana. Antes, al deslizar rápido hacia arriba sobre los
+            // chips, a veces se movía la fila en lugar de abrirse el panel.
+            child: RawGestureDetector(
               behavior: HitTestBehavior.opaque,
-              onVerticalDragUpdate: _onDragUpdate,
-              onVerticalDragEnd: _onDragEnd,
+              gestures: {
+                VerticalDragGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<
+                        VerticalDragGestureRecognizer>(
+                  () => VerticalDragGestureRecognizer(debugOwner: this),
+                  (recognizer) => recognizer
+                    ..gestureSettings =
+                        const DeviceGestureSettings(touchSlop: _verticalSlop)
+                    ..onStart = _onDragStart
+                    ..onUpdate = _onDragUpdate
+                    ..onEnd = _onDragEnd,
+                ),
+              },
               child: Column(
                 children: [
                   _buildHandle(context),
-                  _buildChips(context, colorOf),
+                  _buildChips(context, colorOf, folderOf),
                 ],
               ),
             ),
@@ -286,6 +335,7 @@ class _GroupPanelState extends State<GroupPanel> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: TextField(
                 controller: _search,
+                focusNode: _searchFocus,
                 onChanged: (_) => setState(() {}),
                 onTap: _open,
                 decoration: InputDecoration(
@@ -303,8 +353,16 @@ class _GroupPanelState extends State<GroupPanel> {
             ),
           ),
           SliverPadding(
+            // Con el teclado abierto, espacio extra abajo para poder
+            // desplazar los últimos grupos por encima del teclado (la
+            // pantalla ya no se encoge con él).
             padding: EdgeInsets.fromLTRB(
-                8, 0, 8, 24 + MediaQuery.paddingOf(context).bottom),
+                8,
+                0,
+                8,
+                24 +
+                    MediaQuery.paddingOf(context).bottom +
+                    MediaQuery.viewInsetsOf(context).bottom),
             sliver: SliverList.list(children: [
               if (!searching) ...[
                 _tile(
@@ -323,7 +381,7 @@ class _GroupPanelState extends State<GroupPanel> {
               for (final group in matches)
                 _tile(
                   label: group.name,
-                  color: group.color == null ? null : colorOf(group),
+                  folderColor: folderOf(group),
                   filter: GroupFilter.group(group.name),
                   notes: widget.counts[group.name] ?? 0,
                   group: group,
@@ -396,7 +454,10 @@ class _GroupPanelState extends State<GroupPanel> {
 
   /// [📁+] [Todas] [Sin grupo] [grupos…], deslizable de lado.
   Widget _buildChips(
-      BuildContext context, Color Function(NoteGroup) colorOf) {
+    BuildContext context,
+    Color Function(NoteGroup) colorOf,
+    Color Function(NoteGroup) folderOf,
+  ) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final selected = widget.selected;
@@ -405,7 +466,8 @@ class _GroupPanelState extends State<GroupPanel> {
       required String label,
       required GroupFilter filter,
       required Color color,
-      FontWeight weight = FontWeight.w600,
+      Color? folderColor,
+      bool muted = false,
       NoteGroup? group,
     }) {
       final isSelected = filter == selected;
@@ -413,7 +475,8 @@ class _GroupPanelState extends State<GroupPanel> {
         key: _chipKey(filter),
         label: label,
         color: color,
-        weight: weight,
+        folderColor: folderColor,
+        muted: muted,
         selected: isSelected,
         onTap: () => _select(filter),
         onMenu: group == null
@@ -434,13 +497,14 @@ class _GroupPanelState extends State<GroupPanel> {
           label: l10n.groupsNone,
           filter: GroupFilter.none,
           color: scheme.onSurfaceVariant,
-          weight: FontWeight.w500,
+          muted: true,
         ),
       for (final group in widget.groups)
         chip(
           label: group.name,
           filter: GroupFilter.group(group.name),
           color: colorOf(group),
+          folderColor: folderOf(group),
           group: group,
         ),
     ];
@@ -470,7 +534,7 @@ class _GroupPanelState extends State<GroupPanel> {
     required String label,
     required GroupFilter filter,
     required int notes,
-    Color? color,
+    Color? folderColor,
     NoteGroup? group,
   }) {
     final l10n = context.l10n;
@@ -482,13 +546,14 @@ class _GroupPanelState extends State<GroupPanel> {
       selected: isSelected,
       selectedColor: scheme.onSurface,
       selectedTileColor: scheme.secondaryContainer,
+      leading: folderColor == null
+          ? null
+          : GroupFolderIcon(folderColor, size: 20),
+      minLeadingWidth: 0,
       title: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: color == null
-            ? null
-            : TextStyle(color: color, fontWeight: FontWeight.w600),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -562,8 +627,9 @@ class _NewGroupButton extends StatelessWidget {
 }
 
 /// Un chip de la fila de grupos: píldora de 44 px de alto con el nombre en
-/// el color del grupo. El elegido se sombrea con un tono tenue de ese mismo
-/// color (y su contorno se nota un poco más); su tamaño no cambia.
+/// color neutro y, en los grupos, la carpetita de su color a la izquierda.
+/// El elegido lleva un contorno de [color] y un fondo muy tenue del mismo
+/// color; su tamaño no cambia.
 class GroupChip extends StatelessWidget {
   const GroupChip({
     super.key,
@@ -571,15 +637,23 @@ class GroupChip extends StatelessWidget {
     required this.color,
     required this.selected,
     required this.onTap,
-    this.weight = FontWeight.w600,
+    this.folderColor,
+    this.muted = false,
     this.onMenu,
   });
 
   final String label;
+
+  /// Color del contorno y del fondo cuando está elegido.
   final Color color;
   final bool selected;
   final VoidCallback onTap;
-  final FontWeight weight;
+
+  /// Color de la carpetita. `null` = sin carpetita (Todas, Sin grupo).
+  final Color? folderColor;
+
+  /// Texto en gris (Sin grupo).
+  final bool muted;
 
   /// Menú del grupo (mantener presionado o clic derecho). `null` = sin menú.
   final void Function(Offset position)? onMenu;
@@ -588,11 +662,12 @@ class GroupChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final shape = StadiumBorder(
-      side: BorderSide(
-        color: selected ? color.withValues(alpha: 0.55) : scheme.outline,
-      ),
+      side: selected
+          ? BorderSide(color: color, width: 1.5)
+          : BorderSide(color: scheme.outline),
     );
     final menu = onMenu;
+    final folder = folderColor;
     return Semantics(
       selected: selected,
       child: GestureDetector(
@@ -602,12 +677,16 @@ class GroupChip extends StatelessWidget {
             menu == null ? null : (details) => menu(details.globalPosition),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
+          // El relleno va en la decoración; el contorno, encima
+          // (foregroundDecoration): así su grosor (1 px o 1.5 px elegido) no
+          // cuenta para el tamaño y el chip no cambia de ancho al elegirlo.
           decoration: ShapeDecoration(
-            shape: shape,
+            shape: const StadiumBorder(),
             color: selected
-                ? color.withValues(alpha: 0.18)
+                ? color.withValues(alpha: 0.10)
                 : Colors.transparent,
           ),
+          foregroundDecoration: ShapeDecoration(shape: shape),
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
@@ -615,18 +694,31 @@ class GroupChip extends StatelessWidget {
               onTap: onTap,
               child: Container(
                 height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsetsDirectional.only(
+                    start: folder == null ? 16 : 12, end: 16),
                 alignment: Alignment.center,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 15,
-                    // El mismo grosor elegido o no: si el elegido fuera más
-                    // grueso, el chip se ensancharía y empujaría a los demás.
-                    fontWeight: weight,
-                    color: color,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (folder != null) ...[
+                      GroupFolderIcon(folder),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      label,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 15,
+                        // El mismo grosor elegido o no: si el elegido fuera
+                        // más grueso, el chip se ensancharía y empujaría a
+                        // los demás.
+                        fontWeight: FontWeight.w500,
+                        color: muted && !selected
+                            ? scheme.onSurfaceVariant
+                            : scheme.onSurface,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

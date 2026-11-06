@@ -353,5 +353,55 @@
   "newNoteInPrefix": "New note in",
   "@newNoteInPrefix": {
     "description": "First line of the big 'new note' button (wide/PC view) while viewing a group; the group name goes on the line below."
+  },
+  "searchNotes": "Search notes",
+  "@searchNotes": {
+    "description": "Hint of the search field and tooltip of the search (magnifier) button."
+  },
+  "closeSearch": "Close search",
+  "@closeSearch": {
+    "description": "Tooltip of the back arrow that leaves search mode (phone view)."
+  },
+  "clearSearch": "Clear search",
+  "@clearSearch": {
+    "description": "Tooltip of the X that empties the search field."
+  },
+  "searchingIn": "Searching in {name}",
+  "@searchingIn": {
+    "description": "Says where the search looks: only in the group being viewed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Recipes"
+      }
+    }
+  },
+  "searchingAll": "Searching all notes",
+  "@searchingAll": {
+    "description": "Says the search looks in every note."
+  },
+  "searchAllInstead": "Search all",
+  "@searchAllInstead": {
+    "description": "Button: search in every note instead of only the group being viewed."
+  },
+  "searchOnlyIn": "Only in {name}",
+  "@searchOnlyIn": {
+    "description": "Button: go back to searching only in the group being viewed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Recipes"
+      }
+    }
+  },
+  "noSearchResults": "No notes match \"{query}\"",
+  "@noSearchResults": {
+    "description": "Shown when the search finds nothing.",
+    "placeholders": {
+      "query": {
+        "type": "String",
+        "example": "lemon"
+      }
+    }
   }
 }

@@ -413,4 +413,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newNoteInPrefix => 'New note in';
+
+  @override
+  String get searchNotes => 'Search notes';
+
+  @override
+  String get closeSearch => 'Close search';
+
+  @override
+  String get clearSearch => 'Clear search';
+
+  @override
+  String searchingIn(String name) {
+    return 'Searching in $name';
+  }
+
+  @override
+  String get searchingAll => 'Searching all notes';
+
+  @override
+  String get searchAllInstead => 'Search all';
+
+  @override
+  String searchOnlyIn(String name) {
+    return 'Only in $name';
+  }
+
+  @override
+  String noSearchResults(String query) {
+    return 'No notes match \"$query\"';
+  }
 }
