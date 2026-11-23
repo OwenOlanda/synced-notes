@@ -89,6 +89,47 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   NoteSearch get _search => NoteSearch(_searchText.text);
 
+  /// Resultados con varias coincidencias: cuáles están desplegados y cuántas
+  /// coincidencias se ven de cada uno (de 10 en 10). Clave: [_noteKey].
+  final Set<String> _expandedMatches = {};
+  final Map<String, int> _shownMatches = {};
+  static const int _matchesPage = 10;
+  String _lastQuery = '';
+
+  /// Con qué abrir "Buscar en esta nota" en la columna del editor (PC).
+  ({String query, int match})? _paneFind;
+
+  static String _noteKey(Note note) =>
+      '${note.group ?? ''}/${note.fileName ?? ''}';
+
+  void _onSearchChanged() {
+    final query = _searchText.text;
+    setState(() {
+      // Al cambiar lo buscado, todo vuelve a plegarse.
+      if (query != _lastQuery) {
+        _lastQuery = query;
+        _expandedMatches.clear();
+        _shownMatches.clear();
+      }
+    });
+  }
+
+  void _toggleMatches(Note note) {
+    final key = _noteKey(note);
+    setState(() {
+      if (!_expandedMatches.remove(key)) {
+        _expandedMatches.add(key);
+        _shownMatches[key] = _matchesPage;
+      }
+    });
+  }
+
+  void _showMoreMatches(Note note) {
+    final key = _noteKey(note);
+    setState(() =>
+        _shownMatches[key] = (_shownMatches[key] ?? _matchesPage) + _matchesPage);
+  }
+
   @override
   void dispose() {
     FocusManager.instance.removeListener(_keepShortcutsListening);
@@ -215,7 +256,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
   @override
   void initState() {
     super.initState();
-    _searchText.addListener(() => setState(() {}));
+    _searchText.addListener(_onSearchChanged);
     FocusManager.instance.addListener(_keepShortcutsListening);
     _load();
   }
@@ -298,12 +339,20 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// Vista de PC: abre la nota en la columna del editor. Si ya había otra
   /// abierta, primero resuelve sus cambios (con autoguardado, se guardan;
   /// sin él, pregunta). Si se cancela, no cambia nada.
-  Future<void> _openInPane(Note note) async {
-    if (_isOpenInPane(note)) return;
+  Future<void> _openInPane(Note note,
+      {({String query, int match})? find}) async {
+    if (_isOpenInPane(note)) {
+      // Ya está abierta: solo ir a esa coincidencia.
+      if (find != null) {
+        _editorKey?.currentState?.findAt(find.query, find.match);
+      }
+      return;
+    }
     if (!await _closePane()) return;
     if (!mounted) return;
     setState(() {
       _openNote = note;
+      _paneFind = find;
       _editorKey = GlobalKey<NoteEditorScreenState>();
     });
   }
@@ -334,13 +383,21 @@ class _NotesListScreenState extends State<NotesListScreen> {
     _load();
   }
 
-  Future<void> _open(Note note) async {
-    if (_isWide) return _openInPane(note);
+  /// Abre una nota. Si hay una búsqueda y la nota tiene coincidencias, llega
+  /// con "Buscar en esta nota" puesta en la coincidencia número [match]
+  /// (0 = la primera).
+  Future<void> _open(Note note, {int match = 0}) async {
+    final search = _search;
+    final find = !search.isEmpty && search.matchesIn(note).isNotEmpty
+        ? (query: _searchText.text.trim(), match: match)
+        : null;
+    if (_isWide) return _openInPane(note, find: find);
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => NoteEditorScreen(
         note: note,
         storage: widget.storage,
         settings: widget.settings,
+        initialFind: find,
       ),
     ));
     await _load(); // al regresar, la lista refleja lo que se guardó o borró
@@ -637,6 +694,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
         storage: widget.storage,
         settings: widget.settings,
         embedded: true,
+        initialFind: _paneFind,
         onClose: _onPaneClosed,
         onDeleted: _onPaneClosed,
         onSaved: (note) {
@@ -1085,6 +1143,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
           showGroup: showGroup,
           selected: _isOpenInPane(note),
           search: search.isEmpty ? null : search,
+          matchesExpanded: _expandedMatches.contains(_noteKey(note)),
+          matchesShown: _shownMatches[_noteKey(note)] ?? _matchesPage,
+          onToggleMatches: () => _toggleMatches(note),
+          onShowMoreMatches: () => _showMoreMatches(note),
+          onOpenMatch: (match) => _open(note, match: match),
           onTap: () => _open(note),
           onMenu: (position) => _showNoteMenu(note, position),
         );

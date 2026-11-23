@@ -443,4 +443,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String noSearchResults(String query) {
     return 'No notes match \"$query\"';
   }
+
+  @override
+  String get findInNote => 'Find in note';
+
+  @override
+  String findMatchCount(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String get findNoMatches => 'No results';
+
+  @override
+  String get findPrevious => 'Previous';
+
+  @override
+  String get findNext => 'Next';
+
+  @override
+  String matchesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matches',
+      one: '1 match',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String showMoreMatches(int count) {
+    return 'Show $count more';
+  }
 }

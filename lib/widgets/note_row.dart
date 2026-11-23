@@ -14,6 +14,10 @@ import 'group_colors.dart';
 /// color: así las carpetitas quedan alineadas en una columna a la orilla.
 /// [groupColor] y el nombre del grupo solo se muestran si [showGroup] (en
 /// "Todas"): dentro de un grupo ya se sabe de cuál es cada nota.
+///
+/// Buscando, si la nota tiene 2 o más coincidencias, abajo aparece una
+/// píldora "7 coincidencias" que despliega una línea por coincidencia (con
+/// su pedazo de texto), de 10 en 10. Tocar una abre la nota ahí.
 class NoteRow extends StatelessWidget {
   const NoteRow({
     super.key,
@@ -24,6 +28,11 @@ class NoteRow extends StatelessWidget {
     required this.onMenu,
     this.selected = false,
     this.search,
+    this.matchesExpanded = false,
+    this.matchesShown = 10,
+    this.onToggleMatches,
+    this.onShowMoreMatches,
+    this.onOpenMatch,
   });
 
   final Note note;
@@ -38,6 +47,19 @@ class NoteRow extends StatelessWidget {
 
   /// La nota abierta en el editor (vista de PC): fondo resaltado.
   final bool selected;
+
+  /// Buscando: las coincidencias están desplegadas, y cuántas se ven.
+  final bool matchesExpanded;
+  final int matchesShown;
+
+  /// Tocar la píldora "N coincidencias". `null` = sin píldora.
+  final VoidCallback? onToggleMatches;
+
+  /// Tocar "Mostrar N más".
+  final VoidCallback? onShowMoreMatches;
+
+  /// Tocar una coincidencia (su número, desde 0).
+  final ValueChanged<int>? onOpenMatch;
 
   /// Búsqueda en curso: resalta las palabras encontradas y, si están a media
   /// nota, la vista previa muestra ese pedazo.
@@ -192,6 +214,7 @@ class NoteRow extends StatelessWidget {
                         ],
                       ],
                     ),
+                    ..._buildMatches(context),
                   ],
                 ),
               ),
@@ -202,11 +225,125 @@ class NoteRow extends StatelessWidget {
     );
   }
 
+  /// La píldora "N coincidencias" y, desplegada, una línea por coincidencia.
+  List<Widget> _buildMatches(BuildContext context) {
+    final search = this.search;
+    final toggle = onToggleMatches;
+    if (search == null || toggle == null) return const [];
+    final matches = search.matchesIn(note);
+    if (matches.length < 2) return const [];
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final small = theme.textTheme.bodySmall?.copyWith(
+      fontSize: 12.5,
+      color: scheme.onSurface,
+      fontWeight: FontWeight.w500,
+    );
+    final shown = matchesExpanded
+        ? (matchesShown < matches.length ? matchesShown : matches.length)
+        : 0;
+    final remaining = matches.length - shown;
+    final pill = StadiumBorder(side: BorderSide(color: scheme.outline));
+    return [
+      const SizedBox(height: 8),
+      Material(
+        key: const ValueKey('note-matches-pill'),
+        shape: pill,
+        color: scheme.surfaceContainerHighest,
+        child: InkWell(
+          customBorder: pill,
+          onTap: toggle,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(10, 4, 6, 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l10n.matchesCount(matches.length), style: small),
+                const SizedBox(width: 2),
+                Icon(
+                  matchesExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      if (shown > 0) const SizedBox(height: 6),
+      for (var i = 0; i < shown; i++) _buildMatch(context, matches[i], i),
+      if (matchesExpanded && remaining > 0)
+        TextButton(
+          key: const ValueKey('note-matches-more'),
+          onPressed: onShowMoreMatches,
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsetsDirectional.only(start: 12, end: 12),
+          ),
+          child: Text(l10n.showMoreMatches(
+              remaining < matchesShownStep ? remaining : matchesShownStep)),
+        ),
+    ];
+  }
+
+  /// De cuántas en cuántas se despliegan las coincidencias.
+  static const int matchesShownStep = 10;
+
+  /// Una coincidencia desplegada: su número y el pedazo de texto donde está.
+  Widget _buildMatch(
+      BuildContext context, (bool, int, int) match, int index) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final (inTitle, start, _) = match;
+    final excerpt = inTitle
+        ? note.title
+        : NoteSearch.excerptAround(note.content, start);
+    return InkWell(
+      key: ValueKey('note-match-$index'),
+      borderRadius: BorderRadius.circular(8),
+      onTap: onOpenMatch == null ? null : () => onOpenMatch!(index),
+      child: Container(
+        margin: const EdgeInsetsDirectional.only(start: 2),
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 7, 4, 7),
+        decoration: BoxDecoration(
+          border: BorderDirectional(
+            start: BorderSide(color: scheme.outlineVariant),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            SizedBox(
+              width: 22,
+              child: Text(
+                '${index + 1}',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ),
+            Expanded(
+              child: _highlighted(
+                context,
+                excerpt,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Inicio del texto (o [text], si se da: un pedazo), en una sola línea.
   static String previewOf(Note note, AppLocalizations l10n, {String? text}) {
     text = (text ?? note.content).trim();
     if (text.isEmpty) return l10n.noPreview;
-    final start = text.length > 200 ? text.substring(0, 200) : text;
+    final start = text.length > 200
+        ? text.substring(0, NoteSearch.safeCut(text, 200))
+        : text;
     return start.replaceAll(RegExp(r'\s*\n\s*'), ' · ');
   }
 }

@@ -673,6 +673,123 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Tacos'), findsOneWidget);
     });
+
+    group('varias coincidencias en una nota', () {
+      final sopa = _note(
+          title: 'Sopa',
+          content: 'Sal al gusto.\nAgua y sal.\nMás sal si hace falta.');
+      final pill = find.byKey(const ValueKey('note-matches-pill'));
+      Finder match(int i) => find.byKey(ValueKey('note-match-$i'));
+
+      Future<void> searchFor(WidgetTester tester, List<Note> notes,
+          String text) async {
+        await showList(tester, notes: notes, groups: groups);
+        await tester.tap(find.byTooltip('Buscar notas'));
+        await tester.pumpAndSettle();
+        await search(tester, text);
+      }
+
+      testWidgets('la píldora dice cuántas son y despliega todas',
+          (tester) async {
+        await searchFor(tester, [sopa], 'sal');
+        expect(find.text('3 coincidencias'), findsOneWidget);
+        expect(match(0), findsNothing);
+
+        await tester.tap(pill);
+        await tester.pumpAndSettle();
+        expect(match(0), findsOneWidget);
+        expect(match(2), findsOneWidget);
+        expect(match(3), findsNothing);
+
+        // Tocarla otra vez las pliega.
+        await tester.tap(pill);
+        await tester.pumpAndSettle();
+        expect(match(0), findsNothing);
+      });
+
+      testWidgets('con una sola coincidencia no hay píldora', (tester) async {
+        await searchFor(tester, [sopa], 'agua');
+        expect(find.text('Sopa'), findsOneWidget);
+        expect(pill, findsNothing);
+      });
+
+      testWidgets('de 10 en 10 con "Mostrar N más"', (tester) async {
+        final mucha =
+            _note(title: 'Lista', content: List.filled(12, 'sal').join('\n'));
+        await searchFor(tester, [mucha], 'sal');
+        await tester.tap(pill);
+        await tester.pumpAndSettle();
+        expect(match(9), findsOneWidget);
+        expect(match(10), findsNothing);
+        expect(find.text('Mostrar 2 más'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Mostrar 2 más'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Mostrar 2 más'));
+        await tester.pumpAndSettle();
+        expect(match(11), findsOneWidget);
+        expect(find.byKey(const ValueKey('note-matches-more')), findsNothing);
+      });
+
+      testWidgets('al cambiar lo buscado se pliega', (tester) async {
+        await searchFor(tester, [sopa], 'sal');
+        await tester.tap(pill);
+        await tester.pumpAndSettle();
+        expect(match(0), findsOneWidget);
+        await search(tester, 'sal ');
+        await search(tester, 'sal');
+        expect(match(0), findsNothing);
+      });
+
+      testWidgets('tocar una coincidencia abre la nota justo ahí',
+          (tester) async {
+        await searchFor(tester, [sopa], 'sal');
+        await tester.tap(pill);
+        await tester.pumpAndSettle();
+        await tester.tap(match(1));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        expect(
+            tester
+                .widget<Text>(find.byKey(const ValueKey('find-in-note-count')))
+                .data,
+            '2 de 3');
+      });
+
+      testWidgets('en PC, con la nota ya abierta, salta a otra coincidencia',
+          (tester) async {
+        tester.view.physicalSize = const Size(1280, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await showList(tester, notes: [sopa], groups: groups);
+        await search(tester, 'sal');
+        await tester.tap(pill);
+        await tester.pumpAndSettle();
+        final count = find.byKey(const ValueKey('find-in-note-count'));
+
+        await tester.tap(match(2));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Text>(count).data, '3 de 3');
+
+        await tester.tap(match(0));
+        await tester.pumpAndSettle();
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        expect(tester.widget<Text>(count).data, '1 de 3');
+      });
+
+      testWidgets('tocar la nota abre en la primera coincidencia',
+          (tester) async {
+        await searchFor(tester, [sopa], 'sal');
+        await tester.tap(find.text('Sopa'));
+        await tester.pumpAndSettle();
+        expect(
+            tester
+                .widget<Text>(find.byKey(const ValueKey('find-in-note-count')))
+                .data,
+            '1 de 3');
+      });
+    });
   });
 
   group('vista de PC (ventana ancha)', () {
@@ -903,6 +1020,33 @@ void main() {
       FocusManager.instance.primaryFocus!.unfocus();
       await tester.pumpAndSettle();
       await ctrl(tester, LogicalKeyboardKey.keyN);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+    });
+
+    testWidgets('Ctrl+F dentro de la nota abierta busca en la nota, no en la lista',
+        (tester) async {
+      useWideWindow(tester);
+      await showList(tester, notes: notes, groups: groups);
+      await tester.tap(find.text('Tacos'));
+      await tester.pumpAndSettle();
+      await tester.tap(editorField(1));
+      await tester.pump();
+
+      await ctrl(tester, LogicalKeyboardKey.keyF);
+      final findField = find.byKey(const ValueKey('find-in-note-field'));
+      expect(findField, findsOneWidget);
+      expect(tester.widget<TextField>(findField).focusNode!.hasFocus, isTrue);
+      expect(
+          tester
+              .widget<TextField>(find.byKey(const ValueKey('search-field')))
+              .focusNode!
+              .hasFocus,
+          isFalse);
+
+      // Esc cierra la barra; la nota sigue abierta.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(findField, findsNothing);
       expect(find.byType(NoteEditorScreen), findsOneWidget);
     });
 

@@ -823,6 +823,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No notes match \"{query}\"'**
   String noSearchResults(String query);
+
+  /// Hint of the find bar inside a note and tooltip of the magnifier button in the editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in note'**
+  String get findInNote;
+
+  /// Counter in the find bar inside a note: which result is current and how many there are.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String findMatchCount(int current, int total);
+
+  /// Counter in the find bar inside a note when the text is not found.
+  ///
+  /// In en, this message translates to:
+  /// **'No results'**
+  String get findNoMatches;
+
+  /// Tooltip of the up arrow in the find bar: go to the previous result.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get findPrevious;
+
+  /// Tooltip of the down arrow in the find bar: go to the next result.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get findNext;
+
+  /// Pill under a search result when the note has several matches; tapping it lists them all.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 match} other{{count} matches}}'**
+  String matchesCount(int count);
+
+  /// Button at the end of a note's expanded match list: show the next matches (10 at a time).
+  ///
+  /// In en, this message translates to:
+  /// **'Show {count} more'**
+  String showMoreMatches(int count);
 }
 
 class _AppLocalizationsDelegate

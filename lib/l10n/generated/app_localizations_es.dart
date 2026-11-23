@@ -444,4 +444,37 @@ class AppLocalizationsEs extends AppLocalizations {
   String noSearchResults(String query) {
     return 'Ninguna nota coincide con \"$query\"';
   }
+
+  @override
+  String get findInNote => 'Buscar en esta nota';
+
+  @override
+  String findMatchCount(int current, int total) {
+    return '$current de $total';
+  }
+
+  @override
+  String get findNoMatches => 'Sin resultados';
+
+  @override
+  String get findPrevious => 'Anterior';
+
+  @override
+  String get findNext => 'Siguiente';
+
+  @override
+  String matchesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count coincidencias',
+      one: '1 coincidencia',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String showMoreMatches(int count) {
+    return 'Mostrar $count más';
+  }
 }

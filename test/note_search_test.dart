@@ -61,4 +61,37 @@ void main() {
     // Si ya se ve al principio, no hace falta fragmento.
     expect(NoteSearch('palabra').snippetOf(_note('X', long)), isNull);
   });
+
+  test('coincidencias de una nota: primero el título, luego el texto', () {
+    final search = NoteSearch('sal');
+    expect(search.matchesIn(_note('Sal y pimienta', 'Agua y sal. Más sal.')), [
+      (true, 0, 3),
+      (false, 7, 10),
+      (false, 16, 19),
+    ]);
+    expect(NoteSearch('').matchesIn(_note('Sal', 'sal')), isEmpty);
+  });
+
+  test('pedazo alrededor de una coincidencia, en una línea', () {
+    expect(NoteSearch.excerptAround('Agua\ny sal', 7), 'Agua · y sal');
+    final long = '${'palabra ' * 10}aquí está el limón';
+    final piece = NoteSearch.excerptAround(long, long.indexOf('limón'));
+    expect(piece.startsWith('…'), isTrue);
+    expect(piece, endsWith('el limón'));
+    // Empieza al inicio de una palabra.
+    expect(piece.substring(1).startsWith(RegExp(r'palabra|aquí')), isTrue);
+  });
+
+  test('los cortes nunca parten un emoji a la mitad', () {
+    const text = 'ab😀cd'; // el emoji ocupa las posiciones 2 y 3
+    expect(NoteSearch.safeCut(text, 3), 2);
+    expect(NoteSearch.safeCut(text, 2), 2);
+    expect(NoteSearch.safeCut(text, 4), 4);
+    // Un pedazo cuyo final caería a la mitad del emoji.
+    final long = '${'a' * 159}😀 sal';
+    final piece = NoteSearch.excerptAround(long, 0);
+    expect(piece.endsWith('\uD83D'), isFalse);
+    expect(() => piece.runes.toList(), returnsNormally);
+    expect(piece.codeUnits.last == 0xD83D, isFalse);
+  });
 }

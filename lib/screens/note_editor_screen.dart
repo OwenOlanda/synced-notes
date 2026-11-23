@@ -8,9 +8,11 @@ import '../l10n/l10n.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
+import '../utils/note_search.dart';
 import '../widgets/app_message.dart';
 import '../widgets/blocked_chars_formatter.dart';
 import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/find_highlight_controller.dart';
 import '../widgets/move_note_dialog.dart';
 
 enum _LeaveChoice { save, discard, cancel }
@@ -56,6 +58,7 @@ class NoteEditorScreen extends StatefulWidget {
     this.onSaved,
     this.onDeleted,
     this.onClose,
+    this.initialFind,
   });
 
   final Note note;
@@ -75,6 +78,11 @@ class NoteEditorScreen extends StatefulWidget {
   /// resolvieron (guardados o descartados).
   final VoidCallback? onClose;
 
+  /// Abrir con "Buscar en esta nota" ya puesta: lo buscado y en qué
+  /// coincidencia empezar (0 = la primera; primero cuentan las del título).
+  /// Se usa al abrir una nota desde los resultados de la búsqueda.
+  final ({String query, int match})? initialFind;
+
   @override
   State<NoteEditorScreen> createState() => NoteEditorScreenState();
 }
@@ -84,6 +92,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   static const double _titleOrder = 1;
   static const double _contentOrder = 2;
   static const double _closeOrder = 3;
+  static const double _findOrder = 3.5;
   static const double _saveOrder = 4;
   static const double _menuOrder = 5;
 
@@ -91,9 +100,26 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// La nota tal como está guardada en disco (o en blanco si es nueva).
   late Note _note;
-  late final TextEditingController _title;
-  late final TextEditingController _content;
+  late final FindHighlightController _title;
+  late final FindHighlightController _content;
   final FocusNode _contentFocus = FocusNode();
+  final FocusNode _titleFocus = FocusNode(debugLabel: 'título');
+
+  /// Para encontrar el campo del texto y desplazarlo hasta un resultado.
+  final GlobalKey _contentKey = GlobalKey();
+
+  // Buscar en esta nota -------------------------------------------------------
+
+  /// La barra "Buscar en esta nota" está abierta.
+  bool _findOpen = false;
+  final TextEditingController _findText = TextEditingController();
+  final FocusNode _findFocus = FocusNode(debugLabel: 'buscar en esta nota');
+
+  /// Dónde aparece lo buscado: primero en el título y luego en el texto.
+  /// Cada uno: (¿en el título?, inicio, fin). [_current]: el actual
+  /// (-1 = ninguno).
+  List<(bool, int, int)> _matches = const [];
+  int _current = -1;
   late final AppLifecycleListener _lifecycle;
 
   /// Aviso "el título no puede contener…" al teclear un carácter prohibido.
@@ -116,14 +142,21 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   void initState() {
     super.initState();
     _note = widget.note;
-    _title = TextEditingController(text: _note.title)..addListener(_onChanged);
-    _content = TextEditingController(text: _note.content)
+    _title = FindHighlightController(text: _note.title)
+      ..addListener(_onChanged);
+    _content = FindHighlightController(text: _note.content)
       ..addListener(_onChanged);
     _lifecycle = AppLifecycleListener(
       onPause: _saveIfAutosave, // Android: la app pasa a segundo plano
       onHide: _saveIfAutosave, // Windows: se minimiza la ventana
       onExitRequested: _onExitRequested, // se cierra la app
     );
+    final find = widget.initialFind;
+    if (find != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) findAt(find.query, find.match);
+      });
+    }
   }
 
   @override
@@ -134,6 +167,9 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     _title.dispose();
     _content.dispose();
     _contentFocus.dispose();
+    _titleFocus.dispose();
+    _findText.dispose();
+    _findFocus.dispose();
     super.dispose();
   }
 
@@ -162,11 +198,171 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _onChanged() {
     if (!mounted) return;
+    // Si se edita con la barra de búsqueda abierta, los resultados se
+    // recalculan (se queda en el mismo número de resultado si aún existe).
+    if (_findOpen) _updateMatches();
     setState(() {}); // actualiza el indicador de estado
     _autosaveTimer?.cancel();
     if (widget.settings.autosave && _hasUnsavedChanges) {
       _autosaveTimer = Timer(_autosaveDelay, _save);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Buscar en esta nota
+  // ---------------------------------------------------------------------------
+
+  /// Abre la barra (o, si ya está abierta, vuelve a ella). Si hay texto
+  /// seleccionado en la nota, se busca eso.
+  void _openFind() {
+    final selection = _content.selection;
+    final selected = selection.isValid && !selection.isCollapsed
+        ? selection.textInside(_content.text)
+        : '';
+    if (selected.isNotEmpty && !selected.contains('\n')) {
+      _findText.text = selected;
+    }
+    _findText.selection =
+        TextSelection(baseOffset: 0, extentOffset: _findText.text.length);
+    setState(() => _findOpen = true);
+    _updateMatches(fromStart: true);
+    // Después del cuadro: la primera vez el campo aún no existe.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _findOpen) _findFocus.requestFocus();
+    });
+    _revealCurrent();
+  }
+
+  /// Abre "Buscar en esta nota" con [query] ya escrito y en la coincidencia
+  /// número [match] (0 = la primera), resaltada y a la vista. Para llegar
+  /// desde los resultados de la búsqueda de la lista.
+  ///
+  /// En el celular no enfoca el buscador (no abre el teclado): se llega a
+  /// leer. En PC sí, para seguir con Enter.
+  void findAt(String query, int match) {
+    _findText.text = query;
+    _findText.selection =
+        TextSelection(baseOffset: 0, extentOffset: query.length);
+    setState(() {
+      _findOpen = true;
+      _updateMatches(fromStart: true);
+      if (_matches.isNotEmpty) {
+        _current = match.clamp(0, _matches.length - 1);
+        _applyHighlights();
+      }
+    });
+    if (widget.embedded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _findOpen) _findFocus.requestFocus();
+      });
+    }
+    _revealCurrent();
+  }
+
+  /// Cierra la barra y quita el resaltado. En PC, el cursor queda sobre el
+  /// resultado actual para seguir escribiendo ahí.
+  void _closeFind() {
+    if (!_findOpen) return;
+    final match = _current >= 0 ? _matches[_current] : null;
+    setState(() {
+      _findOpen = false;
+      _matches = const [];
+      _current = -1;
+      _title.clearHighlights();
+      _content.clearHighlights();
+    });
+    if (widget.embedded) {
+      if (match == null) {
+        _contentFocus.requestFocus();
+      } else {
+        final (inTitle, start, end) = match;
+        (inTitle ? _title : _content).selection =
+            TextSelection(baseOffset: start, extentOffset: end);
+        if (inTitle) {
+          _titleFocus.requestFocus();
+        } else {
+          _contentFocus.requestFocus();
+        }
+      }
+    } else {
+      _findFocus.unfocus();
+    }
+  }
+
+  /// Recalcula los resultados. [fromStart]: empezar por el primero (al
+  /// cambiar lo buscado); si no, conservar el número actual si aún existe.
+  void _updateMatches({bool fromStart = false}) {
+    final search = NoteSearch(_findText.text);
+    final matches = [
+      for (final (s, e) in search.rangesIn(_title.text)) (true, s, e),
+      for (final (s, e) in search.rangesIn(_content.text)) (false, s, e),
+    ];
+    var current = fromStart ? 0 : _current;
+    if (matches.isEmpty) {
+      current = -1;
+    } else if (current < 0 || current >= matches.length) {
+      current = 0;
+    }
+    _matches = matches;
+    _current = current;
+    _applyHighlights();
+  }
+
+  /// Pasa los resultados a cada campo (título y texto) para que los pinte.
+  void _applyHighlights() {
+    List<(int, int)> rangesOf(bool title) => [
+          for (final (inTitle, s, e) in _matches)
+            if (inTitle == title) (s, e),
+        ];
+    final inTitle = rangesOf(true);
+    final current = _current;
+    _title.setHighlights(
+        inTitle, current >= 0 && current < inTitle.length ? current : -1);
+    _content.setHighlights(
+        rangesOf(false), current >= inTitle.length ? current - inTitle.length : -1);
+  }
+
+  void _onFindChanged() {
+    setState(() => _updateMatches(fromStart: true));
+    _revealCurrent();
+  }
+
+  /// Ir al siguiente (+1) o al anterior (-1); al llegar al final, da la
+  /// vuelta.
+  void _goToMatch(int step) {
+    if (_matches.isEmpty) return;
+    setState(() {
+      _current = (_current + step) % _matches.length;
+      _applyHighlights();
+    });
+    _revealCurrent();
+  }
+
+  /// Desplaza el texto de la nota hasta que se vea el resultado actual (el
+  /// título siempre se ve).
+  void _revealCurrent() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _current < 0 || _current >= _matches.length) return;
+      final (inTitle, start, _) = _matches[_current];
+      if (inTitle) return;
+      _contentEditable()?.bringIntoView(TextPosition(offset: start));
+    });
+  }
+
+  /// El EditableText del campo del texto (lo que se desplaza).
+  EditableTextState? _contentEditable() {
+    EditableTextState? found;
+    void visit(Element element) {
+      if (found != null) return;
+      if (element is StatefulElement && element.state is EditableTextState) {
+        found = element.state as EditableTextState;
+        return;
+      }
+      element.visitChildren(visit);
+    }
+
+    _contentKey.currentContext?.visitChildElements(visit);
+    return found;
   }
 
   // ---------------------------------------------------------------------------
@@ -406,6 +602,16 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     final l10n = context.l10n;
     return [
       FocusTraversalOrder(
+        order: const NumericFocusOrder(_findOrder),
+        child: IconButton(
+          tooltip: widget.embedded
+              ? '${l10n.findInNote} (Ctrl+F)'
+              : l10n.findInNote,
+          icon: const Icon(Icons.search),
+          onPressed: _openFind,
+        ),
+      ),
+      FocusTraversalOrder(
         order: const NumericFocusOrder(_saveOrder),
         child: IconButton(
           tooltip: l10n.saveTooltip,
@@ -461,6 +667,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
           order: const NumericFocusOrder(_titleOrder),
           child: TextField(
           controller: _title,
+          focusNode: _titleFocus,
           autofocus: !_note.isSaved, // nota nueva: empieza en el título
           style: theme.textTheme.headlineSmall,
           decoration: InputDecoration(
@@ -483,6 +690,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
           child: FocusTraversalOrder(
             order: const NumericFocusOrder(_contentOrder),
             child: TextField(
+            key: _contentKey,
             controller: _content,
             focusNode: _contentFocus,
             maxLines: null,
@@ -498,6 +706,90 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Barra "Buscar en esta nota":
+  ///   [🔍 lo buscado      ]  2 de 5   ▲  ▼  ✕
+  Widget _buildFindBar(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final keys = widget.embedded; // en PC, las pistas de teclas
+    final String count;
+    if (_findText.text.trim().isEmpty) {
+      count = '';
+    } else if (_matches.isEmpty) {
+      count = l10n.findNoMatches;
+    } else {
+      count = l10n.findMatchCount(_current + 1, _matches.length);
+    }
+    final hasMatches = _matches.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 4, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: CallbackShortcuts(
+              bindings: {
+                // Esc cierra la barra (no la nota).
+                const SingleActivator(LogicalKeyboardKey.escape): _closeFind,
+                const SingleActivator(LogicalKeyboardKey.enter, shift: true):
+                    () => _goToMatch(-1),
+              },
+              child: TextField(
+                key: const ValueKey('find-in-note-field'),
+                controller: _findText,
+                focusNode: _findFocus,
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => _onFindChanged(),
+                // Enter: siguiente, sin soltar el campo.
+                onSubmitted: (_) {
+                  _goToMatch(1);
+                  _findFocus.requestFocus();
+                },
+                onEditingComplete: () {},
+                decoration: InputDecoration(
+                  hintText: l10n.findInNote,
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  isDense: true,
+                  filled: true,
+                  fillColor: scheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            count,
+            key: const ValueKey('find-in-note-count'),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          IconButton(
+            tooltip: keys
+                ? '${l10n.findPrevious} (Shift+Enter)'
+                : l10n.findPrevious,
+            icon: const Icon(Icons.keyboard_arrow_up),
+            onPressed: hasMatches ? () => _goToMatch(-1) : null,
+          ),
+          IconButton(
+            tooltip: keys ? '${l10n.findNext} (Enter)' : l10n.findNext,
+            icon: const Icon(Icons.keyboard_arrow_down),
+            onPressed: hasMatches ? () => _goToMatch(1) : null,
+          ),
+          IconButton(
+            tooltip: keys ? '${l10n.closeSearch} (Esc)' : l10n.closeSearch,
+            icon: const Icon(Icons.close),
+            onPressed: _closeFind,
+          ),
+        ],
+      ),
     );
   }
 
@@ -538,6 +830,10 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ),
               const Divider(height: 1),
+              if (_findOpen) ...[
+                _buildFindBar(context),
+                const Divider(height: 1),
+              ],
               Expanded(
                 child: Align(
                   alignment: Alignment.topCenter,
@@ -561,9 +857,17 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
           actions: _buildActions(context),
         ),
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: _buildFields(context),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_findOpen) _buildFindBar(context),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: _buildFields(context),
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -585,8 +889,13 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
         bindings: {
           const SingleActivator(LogicalKeyboardKey.keyS, control: true):
               _manualSave,
-          // Esc cierra la nota (igual que la X o la flecha de regresar).
-          const SingleActivator(LogicalKeyboardKey.escape): _leave,
+          // Ctrl+F dentro de la nota: buscar en esta nota.
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+              _openFind,
+          // Esc cierra la nota (igual que la X o la flecha de regresar);
+          // con la barra de búsqueda abierta, primero cierra la barra.
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              _findOpen ? _closeFind() : _leave(),
         },
         child: page,
       ),

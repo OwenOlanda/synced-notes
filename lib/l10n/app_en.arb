@@ -403,5 +403,43 @@
         "example": "lemon"
       }
     }
+  },
+  "findInNote": "Find in note",
+  "@findInNote": {
+    "description": "Hint of the find bar inside a note and tooltip of the magnifier button in the editor."
+  },
+  "findMatchCount": "{current} of {total}",
+  "@findMatchCount": {
+    "description": "Counter in the find bar inside a note: which result is current and how many there are.",
+    "placeholders": {
+      "current": {"type": "int", "example": "2"},
+      "total": {"type": "int", "example": "5"}
+    }
+  },
+  "findNoMatches": "No results",
+  "@findNoMatches": {
+    "description": "Counter in the find bar inside a note when the text is not found."
+  },
+  "findPrevious": "Previous",
+  "@findPrevious": {
+    "description": "Tooltip of the up arrow in the find bar: go to the previous result."
+  },
+  "findNext": "Next",
+  "@findNext": {
+    "description": "Tooltip of the down arrow in the find bar: go to the next result."
+  },
+  "matchesCount": "{count, plural, =1{1 match} other{{count} matches}}",
+  "@matchesCount": {
+    "description": "Pill under a search result when the note has several matches; tapping it lists them all.",
+    "placeholders": {
+      "count": {"type": "int", "example": "7"}
+    }
+  },
+  "showMoreMatches": "Show {count} more",
+  "@showMoreMatches": {
+    "description": "Button at the end of a note's expanded match list: show the next matches (10 at a time).",
+    "placeholders": {
+      "count": {"type": "int", "example": "10"}
+    }
   }
 }

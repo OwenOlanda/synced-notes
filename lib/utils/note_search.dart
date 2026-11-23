@@ -51,7 +51,38 @@ class NoteSearch {
     // Empezar en el inicio de una palabra, no a la mitad.
     final space = content.lastIndexOf(RegExp(r'\s'), start);
     if (space >= 0 && first - space <= before + 12) start = space + 1;
-    return '…${content.substring(start)}';
+    return '…${content.substring(safeCut(content, start))}';
+  }
+
+  /// Todas las coincidencias de una nota, en el mismo orden que la barra
+  /// "Buscar en esta nota": primero las del título y luego las del texto.
+  /// Cada una: (¿en el título?, inicio, fin).
+  List<(bool, int, int)> matchesIn(Note note) => [
+        for (final (s, e) in rangesIn(note.title)) (true, s, e),
+        for (final (s, e) in rangesIn(note.content)) (false, s, e),
+      ];
+
+  /// Pedazo de [text] alrededor de una coincidencia que empieza en [start]:
+  /// un poco antes (desde el inicio de una palabra, con "…" si no es el
+  /// principio) y en una sola línea (los saltos de línea se ven como " · ").
+  static String excerptAround(String text, int start,
+      {int before = 24, int length = 160}) {
+    var from = start - before;
+    if (from <= 0) {
+      from = 0;
+    } else {
+      // Empezar en el inicio de una palabra, no a la mitad.
+      final space = text.lastIndexOf(RegExp(r'\s'), from);
+      if (space >= 0 && start - space <= before + 12) from = space + 1;
+    }
+    from = safeCut(text, from);
+    final to = safeCut(
+        text, from + length < text.length ? from + length : text.length);
+    final piece = text
+        .substring(from, to)
+        .trim()
+        .replaceAll(RegExp(r'\s*\n\s*'), ' · ');
+    return from > 0 ? '…$piece' : piece;
   }
 
   /// Dónde aparecen las palabras buscadas dentro de [text]: lista de
@@ -81,6 +112,19 @@ class NoteSearch {
       }
     }
     return merged;
+  }
+
+  /// Corrige una posición para no cortar a la mitad de un emoji (o de otro
+  /// carácter que ocupa dos "piezas" UTF-16): si [index] cae entre las dos
+  /// mitades, se recorre al inicio del carácter. Cortar ahí producía texto
+  /// inválido ("string is not well-formed UTF-16") y la fila no se dibujaba.
+  static int safeCut(String text, int index) {
+    if (index <= 0 || index >= text.length) return index;
+    final before = text.codeUnitAt(index - 1);
+    final at = text.codeUnitAt(index);
+    final splitsPair =
+        before >= 0xD800 && before <= 0xDBFF && at >= 0xDC00 && at <= 0xDFFF;
+    return splitsPair ? index - 1 : index;
   }
 
   /// Las palabras de una búsqueda, normalizadas.
