@@ -380,4 +380,101 @@ void main() {
       expect(content(tester).selection.baseOffset, 2);
     });
   });
+
+  group('posición en la nota', () {
+    final date = DateTime(2026, 11, 23, 18, 0);
+    final long = Note(
+      fileName: '2026-11-23_18-00-00 Larga.txt',
+      title: 'Larga',
+      content: List.generate(120, (i) => 'Renglón número $i').join('\n'),
+      createdAt: date,
+      modifiedAt: date,
+    );
+    final jump = find.byKey(const ValueKey('scroll-jump-button'));
+
+    Future<void> showLong(WidgetTester tester) async {
+      await tester.pumpWidget(localizedApp(
+        NoteEditorScreen(note: long, storage: FakeStorage(), settings: settings),
+        locale: const Locale('es'),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    ScrollController scrollOf(WidgetTester tester) => tester
+        .widget<TextField>(find.byType(TextField).last)
+        .scrollController!;
+    TextEditingController contentOf(WidgetTester tester) =>
+        tester.widget<TextField>(find.byType(TextField).last).controller!;
+
+    double opacityOf(WidgetTester tester) => tester
+        .widget<AnimatedOpacity>(
+            find.ancestor(of: jump, matching: find.byType(AnimatedOpacity)))
+        .opacity;
+
+    testWidgets('el botón ↑/↓ sale al desplazar, lleva a la orilla y se esconde',
+        (tester) async {
+      await showLong(tester);
+      expect(opacityOf(tester), 0);
+      // La barra de la derecha (como VS Code) está siempre en la nota.
+      expect(find.byKey(const ValueKey('content-scrollbar')), findsOneWidget);
+
+      await tester.drag(find.byType(TextField).last, const Offset(0, -300));
+      await tester.pumpAndSettle();
+      expect(opacityOf(tester), 1);
+      // Arriba de la mitad: lleva al final.
+      expect(find.byTooltip('Ir al final'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Ir al final'));
+      await tester.pumpAndSettle();
+      final scroll = scrollOf(tester);
+      expect(scroll.offset, scroll.position.maxScrollExtent);
+      // Ahora está abajo: lleva al inicio.
+      expect(find.byTooltip('Ir al inicio'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(opacityOf(tester), 0);
+    });
+
+    testWidgets('arrastrar la barra de la derecha recorre la nota',
+        (tester) async {
+      await showLong(tester);
+      final field = tester.getRect(find.byType(TextField).last);
+      // La barra está en la orilla derecha, arriba (la nota empieza arriba).
+      final grab = Offset(field.right - 6, field.top + 20);
+      await tester.dragFrom(grab, Offset(0, field.height / 2));
+      await tester.pumpAndSettle();
+      expect(scrollOf(tester).offset, greaterThan(300));
+    });
+
+    testWidgets('"Al final" abre la nota hasta abajo', (tester) async {
+      await settings.setNoteOpenPosition(NoteOpenPosition.end);
+      await showLong(tester);
+      final scroll = scrollOf(tester);
+      expect(scroll.offset, scroll.position.maxScrollExtent);
+      expect(contentOf(tester).selection.baseOffset, long.content.length);
+    });
+
+    testWidgets('"Donde me quedé" regresa al mismo lugar', (tester) async {
+      await showLong(tester);
+      expect(scrollOf(tester).offset, 0);
+      await tester.drag(find.byType(TextField).last, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      contentOf(tester).selection =
+          const TextSelection.collapsed(offset: 700);
+      await tester.pump();
+      final before = scrollOf(tester).offset;
+      expect(before, greaterThan(0));
+
+      // Salir de la nota (como al tocar regresar) y volver a abrirla.
+      await tester
+          .state<NoteEditorScreenState>(find.byType(NoteEditorScreen))
+          .prepareToLeave();
+      await tester.pumpWidget(const SizedBox());
+      await showLong(tester);
+      expect(contentOf(tester).selection.baseOffset, 700);
+      // Arriba se ve el mismo renglón (puede variar unos píxeles).
+      expect(scrollOf(tester).offset, closeTo(before, 30));
+    });
+  });
 }

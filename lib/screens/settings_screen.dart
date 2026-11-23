@@ -92,6 +92,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (choice != null) await widget.settings.setThemeMode(choice);
   }
 
+  String _openPositionLabel(
+          AppLocalizations l10n, NoteOpenPosition position) =>
+      switch (position) {
+        NoteOpenPosition.start => l10n.openPositionStart,
+        NoteOpenPosition.end => l10n.openPositionEnd,
+        NoteOpenPosition.last => l10n.openPositionLast,
+      };
+
+  /// "Al abrir una nota": al principio / al final / donde me quedé.
+  Future<void> _chooseOpenPosition() async {
+    final l10n = context.l10n;
+    final current = widget.settings.noteOpenPosition;
+    final choice = await showDialog<NoteOpenPosition>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(l10n.openPositionTitle),
+        children: [
+          for (final position in NoteOpenPosition.values)
+            ListTile(
+              title: Text(_openPositionLabel(l10n, position)),
+              trailing:
+                  position == current ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.of(context).pop(position),
+            ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    await widget.settings.setNoteOpenPosition(choice);
+  }
+
   /// Texto del tema actual, ej. "Del sistema (Oscuro)" o "Claro".
   String _currentThemeLabel(AppLocalizations l10n) {
     switch (widget.settings.themeMode) {
@@ -195,6 +226,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: Text(l10n.autoCapitalizeDescription),
               value: widget.settings.autoCapitalize,
               onChanged: widget.settings.setAutoCapitalize,
+            ),
+          ),
+          ListenableBuilder(
+            listenable: widget.settings,
+            builder: (context, _) => ListTile(
+              key: const ValueKey('open-position-tile'),
+              leading: const Icon(Icons.bookmark_outline),
+              title: Text(l10n.openPositionTitle),
+              subtitle: Text(_openPositionLabel(
+                  l10n, widget.settings.noteOpenPosition)),
+              onTap: _chooseOpenPosition,
             ),
           ),
           const Divider(),

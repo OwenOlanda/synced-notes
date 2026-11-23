@@ -83,4 +83,33 @@ void main() {
     await settings.setThemeMode(ThemeMode.system);
     expect((await AppSettings.load()).themeMode, ThemeMode.system);
   });
+
+  test('las notas abren "donde me quedé" por defecto y se puede cambiar',
+      () async {
+    final settings = await AppSettings.load();
+    expect(settings.noteOpenPosition, NoteOpenPosition.last);
+    await settings.setNoteOpenPosition(NoteOpenPosition.end);
+    expect((await AppSettings.load()).noteOpenPosition, NoteOpenPosition.end);
+  });
+
+  test('recuerda dónde se quedó cada nota', () async {
+    final settings = await AppSettings.load();
+    expect(settings.notePositionOf('a'), isNull);
+    await settings.setNotePosition(
+        'a', const NotePosition(cursor: 12, topChar: 5));
+    final reopened = await AppSettings.load();
+    expect(reopened.notePositionOf('a')!.cursor, 12);
+    expect(reopened.notePositionOf('a')!.topChar, 5);
+  });
+
+  test('solo recuerda las posiciones de las notas más recientes', () async {
+    final settings = await AppSettings.load();
+    const max = AppSettings.maxRememberedPositions;
+    for (var i = 0; i <= max; i++) {
+      await settings.setNotePosition(
+          'n$i', NotePosition(cursor: i, topChar: 0));
+    }
+    expect(settings.notePositionOf('n0'), isNull); // la más vieja se fue
+    expect(settings.notePositionOf('n$max')!.cursor, max);
+  });
 }

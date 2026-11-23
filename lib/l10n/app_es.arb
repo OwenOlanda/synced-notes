@@ -137,5 +137,11 @@
   "autoCapitalizeTitle": "Mayúscula automática",
   "autoCapitalizeDescription": "Empieza con mayúscula después de un punto o de un salto de línea. Lo aplica el teclado del celular.",
   "undo": "Deshacer",
-  "redo": "Rehacer"
+  "redo": "Rehacer",
+  "openPositionTitle": "Al abrir una nota",
+  "openPositionStart": "Al principio",
+  "openPositionEnd": "Al final",
+  "openPositionLast": "Donde me quedé",
+  "scrollToTop": "Ir al inicio",
+  "scrollToBottom": "Ir al final"
 }

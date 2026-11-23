@@ -507,4 +507,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get redo => 'Redo';
+
+  @override
+  String get openPositionTitle => 'When opening a note';
+
+  @override
+  String get openPositionStart => 'At the beginning';
+
+  @override
+  String get openPositionEnd => 'At the end';
+
+  @override
+  String get openPositionLast => 'Where I left off';
+
+  @override
+  String get scrollToTop => 'Go to top';
+
+  @override
+  String get scrollToBottom => 'Go to bottom';
 }

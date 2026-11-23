@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,7 +13,8 @@ import '../utils/note_search.dart';
 /// - qué grupo se estaba viendo en la lista;
 /// - el tema (claro, oscuro o el del sistema);
 /// - las opciones de búsqueda (Aa, á, ab);
-/// - si el teclado empieza las oraciones con mayúscula.
+/// - si el teclado empieza las oraciones con mayúscula;
+/// - dónde se abre una nota y dónde se quedó cada una (en este dispositivo).
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._prefs);
 
@@ -22,6 +25,8 @@ class AppSettings extends ChangeNotifier {
   static const String _selectedGroupKey = 'selected_group';
   static const String _themeModeKey = 'theme_mode';
   static const String _autoCapitalizeKey = 'auto_capitalize';
+  static const String _openPositionKey = 'note_open_position';
+  static const String _positionsKey = 'note_positions';
   static const String _searchCaseKey = 'search_match_case';
   static const String _searchAccentsKey = 'search_match_accents';
   static const String _searchWholeWordKey = 'search_whole_word';
@@ -98,4 +103,66 @@ class AppSettings extends ChangeNotifier {
     await _prefs.setBool(_autoCapitalizeKey, enabled);
     notifyListeners();
   }
+
+  /// Dónde se abre una nota: al principio, al final o donde se quedó
+  /// (por defecto).
+  NoteOpenPosition get noteOpenPosition =>
+      switch (_prefs.getString(_openPositionKey)) {
+        'start' => NoteOpenPosition.start,
+        'end' => NoteOpenPosition.end,
+        _ => NoteOpenPosition.last,
+      };
+
+  Future<void> setNoteOpenPosition(NoteOpenPosition position) async {
+    await _prefs.setString(_openPositionKey, position.name);
+    notifyListeners();
+  }
+
+  /// Cuántas notas recuerdan su posición (las más recientes).
+  static const int maxRememberedPositions = 300;
+
+  /// Dónde se quedó una nota (en este dispositivo). `null` = no se sabe.
+  NotePosition? notePositionOf(String noteId) {
+    final entry = _positions()[noteId];
+    if (entry is! List || entry.length != 2) return null;
+    final [cursor, top] = entry;
+    if (cursor is! int || top is! int) return null;
+    return NotePosition(cursor: cursor, topChar: top);
+  }
+
+  /// Recuerda dónde se quedó una nota. Se guardan solo las
+  /// [maxRememberedPositions] más recientes, para no crecer sin fin.
+  Future<void> setNotePosition(String noteId, NotePosition position) async {
+    final positions = _positions()
+      ..remove(noteId) // al final = la más reciente
+      ..[noteId] = [position.cursor, position.topChar];
+    while (positions.length > maxRememberedPositions) {
+      positions.remove(positions.keys.first);
+    }
+    await _prefs.setString(_positionsKey, jsonEncode(positions));
+  }
+
+  Map<String, dynamic> _positions() {
+    final raw = _prefs.getString(_positionsKey);
+    if (raw == null) return <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    } on FormatException {
+      return <String, dynamic>{}; // dañado: se empieza de nuevo
+    }
+  }
+}
+
+/// Dónde se abre una nota.
+enum NoteOpenPosition { start, end, last }
+
+/// Dónde se quedó una nota, en letras (no en píxeles): [cursor] es dónde
+/// estaba el cursor y [topChar], la letra que se veía hasta arriba. Así
+/// sirve aunque cambie el ancho de la ventana.
+class NotePosition {
+  const NotePosition({required this.cursor, required this.topChar});
+
+  final int cursor;
+  final int topChar;
 }

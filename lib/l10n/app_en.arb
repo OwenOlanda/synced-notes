@@ -471,5 +471,17 @@
   "undo": "Undo",
   "@undo": {"description": "Tooltip of the undo button in the note editor."},
   "redo": "Redo",
-  "@redo": {"description": "Tooltip of the redo button in the note editor."}
+  "@redo": {"description": "Tooltip of the redo button in the note editor."},
+  "openPositionTitle": "When opening a note",
+  "@openPositionTitle": {"description": "Setting: where a note opens (beginning, end or where you left off)."},
+  "openPositionStart": "At the beginning",
+  "@openPositionStart": {"description": "Option of openPositionTitle."},
+  "openPositionEnd": "At the end",
+  "@openPositionEnd": {"description": "Option of openPositionTitle."},
+  "openPositionLast": "Where I left off",
+  "@openPositionLast": {"description": "Option of openPositionTitle (default): the scroll and cursor position of the last visit, on this device."},
+  "scrollToTop": "Go to top",
+  "@scrollToTop": {"description": "Tooltip of the round button that jumps to the beginning of the note."},
+  "scrollToBottom": "Go to bottom",
+  "@scrollToBottom": {"description": "Tooltip of the round button that jumps to the end of the note."}
 }

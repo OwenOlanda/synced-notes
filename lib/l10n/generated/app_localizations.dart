@@ -925,6 +925,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Redo'**
   String get redo;
+
+  /// Setting: where a note opens (beginning, end or where you left off).
+  ///
+  /// In en, this message translates to:
+  /// **'When opening a note'**
+  String get openPositionTitle;
+
+  /// Option of openPositionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'At the beginning'**
+  String get openPositionStart;
+
+  /// Option of openPositionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'At the end'**
+  String get openPositionEnd;
+
+  /// Option of openPositionTitle (default): the scroll and cursor position of the last visit, on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Where I left off'**
+  String get openPositionLast;
+
+  /// Tooltip of the round button that jumps to the beginning of the note.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to top'**
+  String get scrollToTop;
+
+  /// Tooltip of the round button that jumps to the end of the note.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to bottom'**
+  String get scrollToBottom;
 }
 
 class _AppLocalizationsDelegate

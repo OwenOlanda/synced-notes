@@ -171,6 +171,112 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     if (mounted) setState(() {}); // habilitar ↶ ↷
   }
 
+  // Desplazamiento: botón ir al inicio / al final y "donde me quedé" -------
+
+  /// El desplazamiento del texto de la nota.
+  final ScrollController _contentScroll = ScrollController();
+
+  /// El botón redondo ↑/↓ se ve mientras se desplaza y se esconde solo.
+  final ValueNotifier<bool> _jumpVisible = ValueNotifier(false);
+  Timer? _jumpHideTimer;
+  static const Duration _jumpVisibleFor = Duration(milliseconds: 2500);
+
+  /// Dónde estaba la nota la última vez que se midió (se guarda al salir).
+  NotePosition? _position;
+
+  /// Con qué se identifica la nota para recordar su posición: su fecha de
+  /// creación (no cambia aunque cambie el título).
+  String get _positionId => _note.createdAt.toIso8601String();
+
+  /// ¿Ya se midió el texto? (Antes, Flutter no sabe qué tan larga es la
+  /// nota y preguntar por su largo falla.)
+  bool get _scrollReady =>
+      _contentScroll.hasClients &&
+      _contentScroll.position.hasContentDimensions;
+
+  void _onContentScroll() {
+    if (!_scrollReady) return;
+    if (_contentScroll.position.maxScrollExtent <= 0) return;
+    _jumpVisible.value = true;
+    _jumpHideTimer?.cancel();
+    _jumpHideTimer =
+        Timer(_jumpVisibleFor, () => _jumpVisible.value = false);
+  }
+
+  /// Arriba de la mitad: al final. Abajo de la mitad: al inicio.
+  bool get _jumpGoesDown {
+    if (!_scrollReady) return true;
+    final position = _contentScroll.position;
+    return position.pixels < position.maxScrollExtent / 2;
+  }
+
+  void _jumpToEdge() {
+    if (!_scrollReady) return;
+    final position = _contentScroll.position;
+    _contentScroll.animateTo(
+      _jumpGoesDown ? position.maxScrollExtent : 0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Mide dónde está la nota: el cursor y la letra que se ve hasta arriba.
+  void _measurePosition() {
+    final editable = _contentEditable()?.renderEditable;
+    if (editable == null || !editable.attached || !editable.hasSize) return;
+    final top = editable
+        .getPositionForPoint(editable.localToGlobal(const Offset(1, 1)))
+        .offset;
+    final selection = _content.selection;
+    _position = NotePosition(
+      cursor: selection.isValid ? selection.baseOffset : 0,
+      topChar: top,
+    );
+  }
+
+  /// Guarda dónde se quedó la nota (en este dispositivo).
+  void _rememberPosition() {
+    _measurePosition();
+    final position = _position;
+    if (position == null || !_note.isSaved) return;
+    widget.settings.setNotePosition(_positionId, position);
+  }
+
+  /// Al abrir: al principio, al final o donde se quedó (Ajustes). Si se
+  /// llega desde los resultados de una búsqueda, manda la búsqueda.
+  void _restorePosition() {
+    if (!mounted || !_note.isSaved || !_scrollReady) return;
+    final text = _content.text;
+    final scroll = _contentScroll.position;
+    switch (widget.settings.noteOpenPosition) {
+      case NoteOpenPosition.start:
+        _content.selection = const TextSelection.collapsed(offset: 0);
+        _contentScroll.jumpTo(0);
+      case NoteOpenPosition.end:
+        _content.selection = TextSelection.collapsed(offset: text.length);
+        _contentScroll.jumpTo(scroll.maxScrollExtent);
+      case NoteOpenPosition.last:
+        final saved = widget.settings.notePositionOf(_positionId);
+        if (saved == null) {
+          _content.selection = const TextSelection.collapsed(offset: 0);
+          return;
+        }
+        _content.selection = TextSelection.collapsed(
+            offset: NoteSearch.safeCut(
+                text, saved.cursor.clamp(0, text.length).toInt()));
+        final editable = _contentEditable()?.renderEditable;
+        if (editable == null || !editable.hasSize) return;
+        final top = NoteSearch.safeCut(
+            text, saved.topChar.clamp(0, text.length).toInt());
+        final y = editable
+                .getLocalRectForCaret(TextPosition(offset: top))
+                .top +
+            scroll.pixels;
+        _contentScroll
+            .jumpTo(y.clamp(0.0, scroll.maxScrollExtent).toDouble());
+    }
+  }
+
   Timer? _autosaveTimer;
   Future<void> _saveQueue = Future.value();
   bool _saving = false;
@@ -201,8 +307,12 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
       onHide: _saveIfAutosave, // Windows: se minimiza la ventana
       onExitRequested: _onExitRequested, // se cierra la app
     );
+    _contentScroll.addListener(_onContentScroll);
     final find = widget.initialFind;
     _findFromList = find != null;
+    if (find == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _restorePosition());
+    }
     if (find != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) findAt(find.query, find.match);
@@ -223,6 +333,14 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     _findFocus.dispose();
     _titleUndo.dispose();
     _contentUndo.dispose();
+    // Lo último que se midió (al desplazar o al salir).
+    final position = _position;
+    if (position != null && _note.isSaved) {
+      widget.settings.setNotePosition(_positionId, position);
+    }
+    _jumpHideTimer?.cancel();
+    _contentScroll.dispose();
+    _jumpVisible.dispose();
     super.dispose();
   }
 
@@ -459,6 +577,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   Future<void> _saveIfAutosave() async {
+    _rememberPosition(); // la app pasa a segundo plano o se cierra
     if (widget.settings.autosave) await _save();
   }
 
@@ -564,6 +683,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
 
   Future<bool> _prepareToLeave() async {
     _autosaveTimer?.cancel();
+    _rememberPosition();
     if (_deleted || !_hasUnsavedChanges) return true;
 
     if (!widget.settings.autosave) {
@@ -790,11 +910,24 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
         Expanded(
           child: FocusTraversalOrder(
             order: const NumericFocusOrder(_contentOrder),
-            child: TextField(
+            // Barra a la derecha (como VS Code / Sublime): dice en qué parte
+            // de la nota vas y cuánto falta; se puede arrastrar.
+            // El margen de la orilla va en el tema: Scrollbar no lo recibe.
+            child: ScrollbarTheme(
+              data: ScrollbarTheme.of(context).copyWith(crossAxisMargin: 3),
+              child: Scrollbar(
+              key: const ValueKey('content-scrollbar'),
+              controller: _contentScroll,
+              thumbVisibility: true,
+              interactive: true,
+              thickness: 5,
+              radius: const Radius.circular(3),
+              child: TextField(
             key: _contentKey,
             controller: _content,
             focusNode: _contentFocus,
             undoController: _contentUndo,
+            scrollController: _contentScroll,
             textCapitalization: capitalization,
             maxLines: null,
             expands: true,
@@ -807,9 +940,66 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
               contentPadding: fieldPadding,
             ),
           ),
+            ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  /// Los campos con el botón redondo ↑/↓ encima, abajo a la derecha. Se ve
+  /// mientras se desplaza la nota (y unos segundos después); la flecha
+  /// indica a dónde lleva: arriba de la mitad, al final; abajo, al inicio.
+  /// Al terminar de desplazar se mide dónde quedó la nota.
+  Widget _withJumpButton(BuildContext context, Widget fields,
+      {required double right}) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return NotificationListener<ScrollEndNotification>(
+      onNotification: (_) {
+        _measurePosition();
+        return false;
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(child: fields),
+          PositionedDirectional(
+            end: right,
+            bottom: 16,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _jumpVisible,
+              builder: (context, visible, _) => IgnorePointer(
+                ignoring: !visible,
+                child: AnimatedOpacity(
+                  opacity: visible ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: ListenableBuilder(
+                    listenable: _contentScroll,
+                    builder: (context, _) {
+                      final down = _jumpGoesDown;
+                      return Material(
+                        key: const ValueKey('scroll-jump-button'),
+                        shape: const CircleBorder(),
+                        color: scheme.surfaceContainerHighest
+                            .withValues(alpha: 0.92),
+                        elevation: 2,
+                        child: IconButton(
+                          tooltip: down ? l10n.scrollToBottom : l10n.scrollToTop,
+                          icon: Icon(down
+                              ? Icons.arrow_downward
+                              : Icons.arrow_upward),
+                          onPressed: _jumpToEdge,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1008,8 +1198,12 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
                     constraints: const BoxConstraints(maxWidth: 760),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 4, bottom: 16),
-                      child: _buildFields(context,
-                          side: const EdgeInsets.symmetric(horizontal: 32)),
+                      child: _withJumpButton(
+                        context,
+                        _buildFields(context,
+                            side: const EdgeInsets.symmetric(horizontal: 32)),
+                        right: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -1032,7 +1226,11 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: _buildFields(context, side: _phoneSides(context)),
+                  child: _withJumpButton(
+                    context,
+                    _buildFields(context, side: _phoneSides(context)),
+                    right: 16,
+                  ),
                 ),
               ),
               if (_showKeyboardBar(context)) _buildKeyboardBar(context),

@@ -508,4 +508,22 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get redo => 'Rehacer';
+
+  @override
+  String get openPositionTitle => 'Al abrir una nota';
+
+  @override
+  String get openPositionStart => 'Al principio';
+
+  @override
+  String get openPositionEnd => 'Al final';
+
+  @override
+  String get openPositionLast => 'Donde me quedé';
+
+  @override
+  String get scrollToTop => 'Ir al inicio';
+
+  @override
+  String get scrollToBottom => 'Ir al final';
 }
