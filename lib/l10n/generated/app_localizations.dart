@@ -865,6 +865,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show {count} more'**
   String showMoreMatches(int count);
+
+  /// Option of the search scope menu: search in every note.
+  ///
+  /// In en, this message translates to:
+  /// **'All notes'**
+  String get scopeAllNotes;
+
+  /// Tooltip of the search scope ("Searching in Recipes ▾"), which opens a menu to search in another group.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose where to search'**
+  String get searchScopeChoose;
 }
 
 class _AppLocalizationsDelegate

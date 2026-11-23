@@ -127,5 +127,7 @@
   "findPrevious": "Anterior",
   "findNext": "Siguiente",
   "matchesCount": "{count, plural, =1{1 coincidencia} other{{count} coincidencias}}",
-  "showMoreMatches": "Mostrar {count} más"
+  "showMoreMatches": "Mostrar {count} más",
+  "scopeAllNotes": "Todas las notas",
+  "searchScopeChoose": "Elegir dónde buscar"
 }

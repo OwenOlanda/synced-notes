@@ -441,5 +441,13 @@
     "placeholders": {
       "count": {"type": "int", "example": "10"}
     }
+  },
+  "scopeAllNotes": "All notes",
+  "@scopeAllNotes": {
+    "description": "Option of the search scope menu: search in every note."
+  },
+  "searchScopeChoose": "Choose where to search",
+  "@searchScopeChoose": {
+    "description": "Tooltip of the search scope (\"Searching in Recipes ▾\"), which opens a menu to search in another group."
   }
 }

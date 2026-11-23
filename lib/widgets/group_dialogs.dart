@@ -71,6 +71,7 @@ class _GroupNameDialogState extends State<_GroupNameDialog> {
   late final BlockedCharsFormatter _formatter = BlockedCharsFormatter(
     NoteStorage.forbiddenTitleChars,
     onBlocked: _forbiddenHint.show,
+    onAllowed: _forbiddenHint.hide,
   );
 
   @override

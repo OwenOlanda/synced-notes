@@ -54,6 +54,20 @@ void main() {
     expect(find.textContaining('no puede contener'), findsNothing);
   });
 
+  testWidgets('título: el aviso se quita al seguir escribiendo',
+      (tester) async {
+    await showEditor(tester);
+    await tester.enterText(find.byType(TextField).first, 'Lista: súper');
+    await tester.pump();
+    expect(find.textContaining('no puede contener'), findsOneWidget);
+
+    // Se escribe algo permitido: el aviso se va de inmediato.
+    await tester.enterText(find.byType(TextField).first, 'Lista súper!');
+    await tester.pump();
+    expect(find.textContaining('no puede contener'), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('título: sin caracteres prohibidos no hay aviso',
       (tester) async {
     await showEditor(tester);

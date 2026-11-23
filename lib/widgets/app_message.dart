@@ -25,6 +25,8 @@ extension AppMessages on ScaffoldMessengerState {
     hideCurrentSnackBar();
     showSnackBar(SnackBar(
       behavior: SnackBarBehavior.floating,
+      // Se quita deslizándolo a la izquierda o a la derecha.
+      dismissDirection: DismissDirection.horizontal,
       width: width,
       duration: duration,
       backgroundColor: background,

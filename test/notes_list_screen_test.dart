@@ -588,6 +588,14 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    /// El texto de "Buscando en …" (con el nombre del grupo subrayado, es
+    /// un Text.rich).
+    String scopeText(WidgetTester tester) {
+      final text = tester.widget<Text>(scope);
+      return text.data ??
+          text.textSpan!.toPlainText(includePlaceholders: false);
+    }
+
     testWidgets('la lupa busca en título y texto', (tester) async {
       await showList(tester, notes: notes, groups: groups);
       await tester.tap(find.byTooltip('Buscar notas'));
@@ -624,7 +632,7 @@ void main() {
       await choose(tester, 'Recetas');
       await tester.tap(find.byTooltip('Buscar notas'));
       await tester.pumpAndSettle();
-      expect(tester.widget<Text>(scope).data, 'Buscando en Recetas');
+      expect(scopeText(tester), 'Buscando en Recetas');
 
       await search(tester, 'tia');
       expect(find.text('Ninguna nota coincide con "tia"'), findsOneWidget);
@@ -632,8 +640,108 @@ void main() {
       await tester.tap(find.text('Buscar en todas'));
       await tester.pumpAndSettle();
       expect(find.text('Querida tía'), findsOneWidget);
-      expect(tester.widget<Text>(scope).data, 'Buscando en todas las notas');
+      expect(scopeText(tester), 'Buscando en todas las notas');
       expect(find.text('Solo en Recetas'), findsOneWidget);
+    });
+
+    testWidgets('con el buscador vacío, "Buscar en todas" muestra todas',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await choose(tester, 'Recetas');
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Suelta'), findsNothing);
+
+      await tester.tap(find.text('Buscar en todas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Suelta'), findsOneWidget);
+      expect(find.text('Tacos'), findsOneWidget);
+
+      await tester.tap(find.text('Solo en Recetas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Suelta'), findsNothing);
+    });
+
+    testWidgets('la carpetita del grupo con su color y el menú cambia de grupo',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await choose(tester, 'Recetas');
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+
+      final theme = Theme.of(tester.element(scope));
+      expect(
+          tester
+              .widget<GroupFolderIcon>(
+                  find.byKey(const ValueKey('search-scope-folder')))
+              .color,
+          displayColor(GroupColor.orange, theme.brightness));
+
+      // Tocar "Recetas ▾" despliega los lugares; el actual va marcado.
+      await tester.tap(find.byKey(const ValueKey('search-scope-menu')));
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<CheckedPopupMenuItem<GroupFilter>>(find.ancestor(
+                  of: find.text('Recetas').last,
+                  matching: find.byType(CheckedPopupMenuItem<GroupFilter>)))
+              .checked,
+          isTrue);
+      await tester.tap(find.ancestor(
+          of: find.text('Cartas').last,
+          matching: find.byType(CheckedPopupMenuItem<GroupFilter>)));
+      await tester.pumpAndSettle();
+      expect(scopeText(tester), 'Buscando en Cartas');
+      expect(find.text('Querida tía'), findsOneWidget);
+      expect(find.text('Tacos'), findsNothing);
+
+      // Es como tocar su chip: "Solo en" se refiere a Cartas...
+      await tester.tap(find.text('Buscar en todas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Solo en Cartas'), findsOneWidget);
+
+      // ...y al salir de la búsqueda se queda en Cartas.
+      await tester.tap(find.byTooltip('Cerrar búsqueda'));
+      await tester.pumpAndSettle();
+      expect(find.text('Querida tía'), findsOneWidget);
+      expect(find.text('Tacos'), findsNothing);
+    });
+
+    testWidgets('la ✕ de la barra dentro de la nota cierra también esta búsqueda',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      await search(tester, 'salsa');
+      await tester.tap(find.text('Tacos'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Cerrar búsqueda'));
+      await tester.pumpAndSettle();
+      // Botón "Atrás" del sistema.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(searchField, findsNothing);
+      expect(find.text('Suelta'), findsOneWidget);
+    });
+
+    testWidgets('sin tocar la ✕, al regresar siguen los resultados',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      await search(tester, 'salsa');
+      await tester.tap(find.text('Tacos'));
+      await tester.pumpAndSettle();
+
+      // Botón "Atrás" del sistema.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(searchField, findsOneWidget);
+      expect(find.text('Suelta'), findsNothing);
+      // El teclado estaba escondido: el buscador no recupera el foco.
+      expect(tester.widget<TextField>(searchField).focusNode!.hasFocus,
+          isFalse);
     });
 
     testWidgets('la flecha cierra la búsqueda y vuelve la lista completa',

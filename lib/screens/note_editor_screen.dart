@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
@@ -59,6 +60,7 @@ class NoteEditorScreen extends StatefulWidget {
     this.onDeleted,
     this.onClose,
     this.initialFind,
+    this.onFindDismissed,
   });
 
   final Note note;
@@ -82,6 +84,10 @@ class NoteEditorScreen extends StatefulWidget {
   /// coincidencia empezar (0 = la primera; primero cuentan las del título).
   /// Se usa al abrir una nota desde los resultados de la búsqueda.
   final ({String query, int match})? initialFind;
+
+  /// Se cerró (con la ✕ o Esc) la barra de búsqueda que venía de
+  /// [initialFind]: quien abrió la nota puede cerrar también su búsqueda.
+  final VoidCallback? onFindDismissed;
 
   @override
   State<NoteEditorScreen> createState() => NoteEditorScreenState();
@@ -112,6 +118,9 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// La barra "Buscar en esta nota" está abierta.
   bool _findOpen = false;
+
+  /// La barra se abrió sola al llegar desde los resultados de la lista.
+  bool _findFromList = false;
   final TextEditingController _findText = TextEditingController();
   final FocusNode _findFocus = FocusNode(debugLabel: 'buscar en esta nota');
 
@@ -129,6 +138,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   late final BlockedCharsFormatter _titleFormatter = BlockedCharsFormatter(
     NoteStorage.forbiddenTitleChars,
     onBlocked: _forbiddenHint.show,
+    onAllowed: _forbiddenHint.hide,
   );
 
   Timer? _autosaveTimer;
@@ -152,6 +162,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
       onExitRequested: _onExitRequested, // se cierra la app
     );
     final find = widget.initialFind;
+    _findFromList = find != null;
     if (find != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) findAt(find.query, find.match);
@@ -263,6 +274,10 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   /// resultado actual para seguir escribiendo ahí.
   void _closeFind() {
     if (!_findOpen) return;
+    if (_findFromList) {
+      _findFromList = false;
+      widget.onFindDismissed?.call();
+    }
     final match = _current >= 0 ? _matches[_current] : null;
     setState(() {
       _findOpen = false;
@@ -709,6 +724,20 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
+  /// Márgenes del texto en el celular. A los lados, al menos la zona del
+  /// gesto de "atrás" de Android: si el texto llega a la orilla, poner el
+  /// cursor al inicio de un renglón o estirar una selección hasta ahí se
+  /// confunde con ese gesto.
+  EdgeInsets _phonePadding(BuildContext context) {
+    final gestures = MediaQuery.systemGestureInsetsOf(context);
+    return EdgeInsets.fromLTRB(
+      math.max(16.0, gestures.left + 4),
+      0,
+      math.max(16.0, gestures.right + 4),
+      16,
+    );
+  }
+
   /// Barra "Buscar en esta nota":
   ///   [🔍 lo buscado      ]  2 de 5   ▲  ▼  ✕
   Widget _buildFindBar(BuildContext context) {
@@ -863,7 +892,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
               if (_findOpen) _buildFindBar(context),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  padding: _phonePadding(context),
                   child: _buildFields(context),
                 ),
               ),

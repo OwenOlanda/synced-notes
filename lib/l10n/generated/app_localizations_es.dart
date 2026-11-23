@@ -477,4 +477,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String showMoreMatches(int count) {
     return 'Mostrar $count más';
   }
+
+  @override
+  String get scopeAllNotes => 'Todas las notas';
+
+  @override
+  String get searchScopeChoose => 'Elegir dónde buscar';
 }

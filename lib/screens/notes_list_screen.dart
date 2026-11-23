@@ -84,8 +84,13 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// Celular: la barra de arriba está en modo búsqueda.
   bool _searchOpen = false;
 
-  /// Buscar en todas las notas aunque se esté viendo un grupo.
-  bool _searchAll = false;
+  /// Dónde se busca, si es distinto de lo que se está viendo ("Buscar en
+  /// todas"). `null` = en lo que se ve. Elegir un grupo en el menú del
+  /// buscador cambia lo que se ve (como tocar su chip), no esto.
+  GroupFilter? _searchScope;
+
+  /// Dónde se busca ahora.
+  GroupFilter get _scope => _searchScope ?? _filter;
 
   NoteSearch get _search => NoteSearch(_searchText.text);
 
@@ -148,19 +153,21 @@ class _NotesListScreenState extends State<NotesListScreen> {
     _searchText.clear();
     setState(() {
       _searchOpen = false;
-      _searchAll = false;
+      _searchScope = null;
     });
     _shortcutsFocus.requestFocus();
   }
 
-  /// Las notas que se ven: las de lo que se está viendo y, si hay una
-  /// búsqueda, solo las que coinciden (primero las que coinciden en el
-  /// título). Con "Buscar en todas", la búsqueda ignora el grupo.
+  /// Las notas que se ven: las de donde se busca ([_scope]: lo que se está
+  /// viendo, o lo elegido en el buscador) y, si hay algo escrito, solo las
+  /// que coinciden (primero las que coinciden en el título). Con el
+  /// buscador vacío se ven todas las de ese lugar: así, al cambiar a "Buscar
+  /// en todas", la lista cambia de inmediato.
   List<Note> _visibleNotes() {
     final all = _notes ?? const <Note>[];
     final search = _search;
-    if (search.isEmpty) return all.where(_filter.matches).toList();
-    final scoped = _searchAll ? all : all.where(_filter.matches);
+    final scoped = all.where(_scope.matches);
+    if (search.isEmpty) return scoped.toList();
     final found = scoped.where(search.matches).toList();
     return [
       ...found.where(search.matchesTitle),
@@ -168,36 +175,152 @@ class _NotesListScreenState extends State<NotesListScreen> {
     ];
   }
 
-  /// "Buscando en Recetas  [Buscar en todas]" (o al revés).
+  /// Nombre de un lugar donde buscar (Todas / Sin grupo / un grupo).
+  String _filterLabel(GroupFilter filter, AppLocalizations l10n) {
+    if (filter.isAll) return l10n.groupsAll;
+    if (filter.isNone) return l10n.groupsNone;
+    return filter.name!;
+  }
+
+  /// Color de un grupo (para su carpetita y el subrayado). `null` = no es un
+  /// grupo o no tiene color.
+  Color? _colorOfFilter(GroupFilter filter, ThemeData theme) {
+    if (!filter.isGroup) return null;
+    for (final g in _groups) {
+      if (g.name == filter.name && g.color != null) {
+        return displayColor(g.color!, theme.brightness);
+      }
+    }
+    return null;
+  }
+
+  /// "Buscando en Recetas ▾   [Buscar en todas]".
+  ///
+  /// Antes del nombre va la carpetita del color del grupo (una pista de
+  /// dónde se busca). Al tocarlo se despliega un menú para cambiar de grupo
+  /// sin salir de la búsqueda (como los chips); el actual va marcado.
+  /// "Buscar en todas" (o "Solo en Recetas") queda como atajo a un lado.
   Widget _buildSearchScope(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final style = theme.textTheme.bodySmall
-        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
-    final here = _viewLabel(l10n);
-    final everywhere = _filter.isAll || _searchAll;
+        ?.copyWith(color: scheme.onSurfaceVariant);
+    final scope = _scope;
+
+    // "Buscando en 📁 Recetas": la carpetita con el color del grupo es la
+    // pista de dónde se busca (igual que en la lista y los chips).
+    final Widget text;
+    if (scope.isAll) {
+      text = Text(
+        l10n.searchingAll,
+        key: const ValueKey('search-scope'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    } else {
+      final name = _filterLabel(scope, l10n);
+      final full = l10n.searchingIn(name);
+      final at = full.lastIndexOf(name);
+      text = Text.rich(
+        TextSpan(children: [
+          TextSpan(text: full.substring(0, at)),
+          if (scope.isGroup)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(end: 4),
+                child: GroupFolderIcon(
+                  _colorOfFilter(scope, theme),
+                  key: const ValueKey('search-scope-folder'),
+                  size: 14,
+                ),
+              ),
+            ),
+          TextSpan(
+            text: name,
+            style: TextStyle(color: scheme.onSurface),
+          ),
+          TextSpan(text: full.substring(at + name.length)),
+        ]),
+        key: const ValueKey('search-scope'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    }
+
+    PopupMenuEntry<GroupFilter> item(GroupFilter filter, String label) {
+      return CheckedPopupMenuItem<GroupFilter>(
+        value: filter,
+        checked: filter == scope,
+        child: Row(
+          children: [
+            if (filter.isGroup) ...[
+              GroupFolderIcon(_colorOfFilter(filter, theme), size: 18),
+              const SizedBox(width: 10),
+            ],
+            Flexible(
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final picker = PopupMenuButton<GroupFilter>(
+      key: const ValueKey('search-scope-menu'),
+      tooltip: l10n.searchScopeChoose,
+      // Como tocar su chip: se cambia de grupo sin salir de la búsqueda (y
+      // al salir de ella se queda ahí).
+      onSelected: _select,
+      itemBuilder: (context) => [
+        item(GroupFilter.all, l10n.scopeAllNotes),
+        if (_groups.isNotEmpty) item(GroupFilter.none, l10n.groupsNone),
+        for (final g in _groups)
+          item(GroupFilter.group(g.name), g.name),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: text),
+            Icon(Icons.arrow_drop_down,
+                size: 18, color: scheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+
+    final Widget? shortcut;
+    if (!scope.isAll) {
+      shortcut = TextButton(
+        style: TextButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        onPressed: () => setState(() => _searchScope = GroupFilter.all),
+        child: Text(l10n.searchAllInstead),
+      );
+    } else if (!_filter.isAll) {
+      shortcut = TextButton(
+        style: TextButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        onPressed: () => setState(() => _searchScope = null),
+        child: Text(l10n.searchOnlyIn(_viewLabel(l10n))),
+      );
+    } else {
+      shortcut = null;
+    }
+
     return Row(
       children: [
-        Flexible(
-          child: Text(
-            everywhere ? l10n.searchingAll : l10n.searchingIn(here),
-            key: const ValueKey('search-scope'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: style,
-          ),
-        ),
-        if (!_filter.isAll)
-          TextButton(
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-            onPressed: () => setState(() => _searchAll = !_searchAll),
-            child: Text(_searchAll
-                ? l10n.searchOnlyIn(here)
-                : l10n.searchAllInstead),
-          ),
+        Flexible(child: picker),
+        if (shortcut != null) shortcut,
       ],
     );
   }
@@ -312,7 +435,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
   }
 
   Future<void> _select(GroupFilter filter) async {
-    _searchAll = false; // la búsqueda vuelve a ser "en lo que se ve"
+    _searchScope = null; // la búsqueda vuelve a ser "en lo que se ve"
     await widget.settings.setSelectedGroup(filter);
     if (mounted) setState(() {});
   }
@@ -392,14 +515,24 @@ class _NotesListScreenState extends State<NotesListScreen> {
         ? (query: _searchText.text.trim(), match: match)
         : null;
     if (_isWide) return _openInPane(note, find: find);
+    // Si el teclado del buscador estaba escondido, al regresar no debe
+    // volver a abrirse solo: se suelta el foco del buscador antes de salir.
+    if (_searchFocus.hasFocus && MediaQuery.viewInsetsOf(context).bottom == 0) {
+      _searchFocus.unfocus();
+    }
+    // Si dentro de la nota se cierra la barra de búsqueda (✕ o Esc), al
+    // regresar también se cierra la búsqueda de la lista.
+    var findDismissed = false;
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => NoteEditorScreen(
         note: note,
         storage: widget.storage,
         settings: widget.settings,
         initialFind: find,
+        onFindDismissed: () => findDismissed = true,
       ),
     ));
+    if (findDismissed && mounted) _closeSearch();
     await _load(); // al regresar, la lista refleja lo que se guardó o borró
   }
 
@@ -1130,7 +1263,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
 
     // El grupo de cada nota se muestra cuando la lista mezcla grupos.
-    final showGroup = _filter.isAll || (!search.isEmpty && _searchAll);
+    final showGroup = _scope.isAll;
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(8, 4, 8, bottomSpace),
       itemCount: notes.length,
