@@ -132,5 +132,10 @@
   "searchScopeChoose": "Elegir dónde buscar",
   "searchMatchCase": "Distinguir mayúsculas y minúsculas",
   "searchMatchAccents": "Distinguir acentos",
-  "searchWholeWord": "Solo palabras completas"
+  "searchWholeWord": "Solo palabras completas",
+  "settingsSectionWriting": "Escritura",
+  "autoCapitalizeTitle": "Mayúscula automática",
+  "autoCapitalizeDescription": "Empieza con mayúscula después de un punto o de un salto de línea. Lo aplica el teclado del celular.",
+  "undo": "Deshacer",
+  "redo": "Rehacer"
 }

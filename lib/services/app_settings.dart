@@ -10,7 +10,8 @@ import '../utils/note_search.dart';
 /// - el idioma elegido a mano (o ninguno = idioma del sistema);
 /// - qué grupo se estaba viendo en la lista;
 /// - el tema (claro, oscuro o el del sistema);
-/// - las opciones de búsqueda (Aa, á, ab).
+/// - las opciones de búsqueda (Aa, á, ab);
+/// - si el teclado empieza las oraciones con mayúscula.
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._prefs);
 
@@ -20,6 +21,7 @@ class AppSettings extends ChangeNotifier {
   static const String _languageKey = 'language_code';
   static const String _selectedGroupKey = 'selected_group';
   static const String _themeModeKey = 'theme_mode';
+  static const String _autoCapitalizeKey = 'auto_capitalize';
   static const String _searchCaseKey = 'search_match_case';
   static const String _searchAccentsKey = 'search_match_accents';
   static const String _searchWholeWordKey = 'search_whole_word';
@@ -84,6 +86,16 @@ class AppSettings extends ChangeNotifier {
     await _prefs.setBool(_searchCaseKey, options.matchCase);
     await _prefs.setBool(_searchAccentsKey, options.matchAccents);
     await _prefs.setBool(_searchWholeWordKey, options.wholeWord);
+    notifyListeners();
+  }
+
+  /// Mayúscula automática: el teclado empieza con mayúscula después de un
+  /// punto o de un salto de línea (activado por defecto, como en la mayoría
+  /// de las apps de notas).
+  bool get autoCapitalize => _prefs.getBool(_autoCapitalizeKey) ?? true;
+
+  Future<void> setAutoCapitalize(bool enabled) async {
+    await _prefs.setBool(_autoCapitalizeKey, enabled);
     notifyListeners();
   }
 }

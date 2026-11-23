@@ -22,6 +22,10 @@ void main() {
     required bool isWindows,
     Locale locale = const Locale('es'),
   }) async {
+    // Ventana alta: así se construyen todas las secciones sin desplazar.
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(localizedApp(
       SettingsScreen(
         settings: settings,
@@ -38,13 +42,27 @@ void main() {
     await showSettings(tester, isWindows: true);
     expect(settings.autosave, isTrue);
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
     expect(settings.autosave, isFalse);
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
     expect(settings.autosave, isTrue);
+  });
+
+  testWidgets('mayúscula automática: prendida por defecto y se puede apagar',
+      (tester) async {
+    await showSettings(tester, isWindows: true);
+    expect(settings.autoCapitalize, isTrue);
+    final tile = find.byKey(const ValueKey('auto-capitalize-switch'));
+    await tester.scrollUntilVisible(tile, 100,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Mayúscula automática'), findsOneWidget);
+
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(settings.autoCapitalize, isFalse);
   });
 
   testWidgets('el botón "Abrir en el explorador" solo aparece en Windows',

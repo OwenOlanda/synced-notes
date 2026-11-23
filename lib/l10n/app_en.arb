@@ -461,5 +461,15 @@
   "searchWholeWord": "Match whole word",
   "@searchWholeWord": {
     "description": "Tooltip of the \"ab\" search option: only whole words (\"sal\" does not find \"salsa\")."
-  }
+  },
+  "settingsSectionWriting": "Writing",
+  "@settingsSectionWriting": {"description": "Settings section about writing in a note."},
+  "autoCapitalizeTitle": "Automatic capital letters",
+  "@autoCapitalizeTitle": {"description": "Settings switch: the keyboard starts sentences with a capital letter."},
+  "autoCapitalizeDescription": "Starts with a capital letter after a period or a line break. The phone keyboard applies it.",
+  "@autoCapitalizeDescription": {"description": "Explanation under the automatic capital letters switch."},
+  "undo": "Undo",
+  "@undo": {"description": "Tooltip of the undo button in the note editor."},
+  "redo": "Redo",
+  "@redo": {"description": "Tooltip of the redo button in the note editor."}
 }

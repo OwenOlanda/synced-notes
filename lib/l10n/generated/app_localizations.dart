@@ -895,6 +895,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Match whole word'**
   String get searchWholeWord;
+
+  /// Settings section about writing in a note.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing'**
+  String get settingsSectionWriting;
+
+  /// Settings switch: the keyboard starts sentences with a capital letter.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic capital letters'**
+  String get autoCapitalizeTitle;
+
+  /// Explanation under the automatic capital letters switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts with a capital letter after a period or a line break. The phone keyboard applies it.'**
+  String get autoCapitalizeDescription;
+
+  /// Tooltip of the undo button in the note editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// Tooltip of the redo button in the note editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get redo;
 }
 
 class _AppLocalizationsDelegate

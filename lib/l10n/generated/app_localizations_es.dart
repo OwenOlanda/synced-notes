@@ -492,4 +492,20 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get searchWholeWord => 'Solo palabras completas';
+
+  @override
+  String get settingsSectionWriting => 'Escritura';
+
+  @override
+  String get autoCapitalizeTitle => 'Mayúscula automática';
+
+  @override
+  String get autoCapitalizeDescription =>
+      'Empieza con mayúscula después de un punto o de un salto de línea. Lo aplica el teclado del celular.';
+
+  @override
+  String get undo => 'Deshacer';
+
+  @override
+  String get redo => 'Rehacer';
 }

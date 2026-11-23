@@ -99,6 +99,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   static const double _titleOrder = 1;
   static const double _contentOrder = 2;
   static const double _closeOrder = 3;
+  static const double _undoOrder = 3.2;
+  static const double _redoOrder = 3.3;
   static const double _findOrder = 3.5;
   static const double _saveOrder = 4;
   static const double _menuOrder = 5;
@@ -142,6 +144,33 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     onAllowed: _forbiddenHint.hide,
   );
 
+  // Deshacer / rehacer ----------------------------------------------------------
+
+  /// Historial de cambios de cada campo (mientras la nota está abierta).
+  final UndoHistoryController _titleUndo = UndoHistoryController();
+  final UndoHistoryController _contentUndo = UndoHistoryController();
+
+  /// El último campo donde se escribió (al que aplican ↶ ↷): `true` =
+  /// título. Tocar los botones no le quita el foco al campo, pero por si
+  /// acaso se recuerda.
+  bool _lastFieldIsTitle = false;
+
+  UndoHistoryController get _activeUndo =>
+      _lastFieldIsTitle ? _titleUndo : _contentUndo;
+
+  void _undo() => _activeUndo.undo();
+  void _redo() => _activeUndo.redo();
+
+  void _onFieldFocusChanged() {
+    if (_titleFocus.hasFocus) _lastFieldIsTitle = true;
+    if (_contentFocus.hasFocus) _lastFieldIsTitle = false;
+    if (mounted) setState(() {}); // mostrar u ocultar la barrita del teclado
+  }
+
+  void _onUndoChanged() {
+    if (mounted) setState(() {}); // habilitar ↶ ↷
+  }
+
   Timer? _autosaveTimer;
   Future<void> _saveQueue = Future.value();
   bool _saving = false;
@@ -153,10 +182,20 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   void initState() {
     super.initState();
     _note = widget.note;
+    // Con el cursor ya puesto (al final): Flutter solo guarda el texto
+    // original en el historial de deshacer si el campo tiene una posición
+    // de cursor válida; sin ella, lo guardaba hasta tocar el campo y un
+    // cambio rápido ya no se podía deshacer hasta el original.
     _title = FindHighlightController(text: _note.title)
+      ..selection = TextSelection.collapsed(offset: _note.title.length)
       ..addListener(_onChanged);
     _content = FindHighlightController(text: _note.content)
+      ..selection = TextSelection.collapsed(offset: _note.content.length)
       ..addListener(_onChanged);
+    _titleFocus.addListener(_onFieldFocusChanged);
+    _contentFocus.addListener(_onFieldFocusChanged);
+    _titleUndo.addListener(_onUndoChanged);
+    _contentUndo.addListener(_onUndoChanged);
     _lifecycle = AppLifecycleListener(
       onPause: _saveIfAutosave, // Android: la app pasa a segundo plano
       onHide: _saveIfAutosave, // Windows: se minimiza la ventana
@@ -182,6 +221,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     _titleFocus.dispose();
     _findText.dispose();
     _findFocus.dispose();
+    _titleUndo.dispose();
+    _contentUndo.dispose();
     super.dispose();
   }
 
@@ -626,6 +667,28 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   List<Widget> _buildActions(BuildContext context) {
     final l10n = context.l10n;
     return [
+      // En PC, ↶ ↷ en la barra (hay espacio). En el celular van en la
+      // barrita sobre el teclado.
+      if (widget.embedded) ...[
+        FocusTraversalOrder(
+          order: const NumericFocusOrder(_undoOrder),
+          child: IconButton(
+            key: const ValueKey('undo-button'),
+            tooltip: '${l10n.undo} (Ctrl+Z)',
+            icon: const Icon(Icons.undo),
+            onPressed: _activeUndo.value.canUndo ? _undo : null,
+          ),
+        ),
+        FocusTraversalOrder(
+          order: const NumericFocusOrder(_redoOrder),
+          child: IconButton(
+            key: const ValueKey('redo-button'),
+            tooltip: '${l10n.redo} (Ctrl+Y)',
+            icon: const Icon(Icons.redo),
+            onPressed: _activeUndo.value.canRedo ? _redo : null,
+          ),
+        ),
+      ],
       FocusTraversalOrder(
         order: const NumericFocusOrder(_findOrder),
         child: IconButton(
@@ -675,10 +738,20 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Título y texto de la nota.
-  Widget _buildFields(BuildContext context) {
+  /// [side]: el margen a los lados, **dentro** de los campos: así un toque
+  /// en el espacio en blanco a la izquierda de un renglón pone el cursor
+  /// antes de su primera letra, y uno a la derecha, después de la última.
+  Widget _buildFields(BuildContext context, {required EdgeInsets side}) {
+    final fieldPadding =
+        EdgeInsets.fromLTRB(side.left, 12, side.right, 12);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final l10n = context.l10n;
+    // Mayúscula automática (Ajustes): el teclado empieza las oraciones con
+    // mayúscula después de un punto o de un salto de línea.
+    final capitalization = widget.settings.autoCapitalize
+        ? TextCapitalization.sentences
+        : TextCapitalization.none;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -693,11 +766,14 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
           child: TextField(
           controller: _title,
           focusNode: _titleFocus,
+          undoController: _titleUndo,
+          textCapitalization: capitalization,
           autofocus: !_note.isSaved, // nota nueva: empieza en el título
           style: theme.textTheme.headlineSmall,
           decoration: InputDecoration(
             hintText: l10n.titleHint,
             border: InputBorder.none,
+            contentPadding: fieldPadding,
             errorBorder: InputBorder.none,
             focusedErrorBorder: InputBorder.none,
             counterText: '', // oculta el contador de caracteres
@@ -718,6 +794,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
             key: _contentKey,
             controller: _content,
             focusNode: _contentFocus,
+            undoController: _contentUndo,
+            textCapitalization: capitalization,
             maxLines: null,
             expands: true,
             keyboardType: TextInputType.multiline,
@@ -726,6 +804,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
             decoration: InputDecoration(
               hintText: l10n.contentHint,
               border: InputBorder.none,
+              contentPadding: fieldPadding,
             ),
           ),
           ),
@@ -734,17 +813,53 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
+  /// La barrita sobre el teclado (celular): solo mientras se escribe en el
+  /// título o en el texto y el teclado está abierto.
+  bool _showKeyboardBar(BuildContext context) =>
+      (_titleFocus.hasFocus || _contentFocus.hasFocus) &&
+      MediaQuery.viewInsetsOf(context).bottom > 0;
+
+  /// Barrita pegada arriba del teclado con ↶ ↷ (como Google Keep). Se
+  /// pueden agregar más botones aquí después.
+  Widget _buildKeyboardBar(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final undo = _activeUndo.value;
+    return Material(
+      key: const ValueKey('keyboard-bar'),
+      color: scheme.surfaceContainer,
+      child: SizedBox(
+        height: 44,
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            IconButton(
+              key: const ValueKey('undo-button'),
+              tooltip: l10n.undo,
+              icon: const Icon(Icons.undo),
+              onPressed: undo.canUndo ? _undo : null,
+            ),
+            IconButton(
+              key: const ValueKey('redo-button'),
+              tooltip: l10n.redo,
+              icon: const Icon(Icons.redo),
+              onPressed: undo.canRedo ? _redo : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Márgenes del texto en el celular. A los lados, al menos la zona del
   /// gesto de "atrás" de Android: si el texto llega a la orilla, poner el
   /// cursor al inicio de un renglón o estirar una selección hasta ahí se
   /// confunde con ese gesto.
-  EdgeInsets _phonePadding(BuildContext context) {
+  EdgeInsets _phoneSides(BuildContext context) {
     final gestures = MediaQuery.systemGestureInsetsOf(context);
-    return EdgeInsets.fromLTRB(
-      math.max(16.0, gestures.left + 4),
-      0,
-      math.max(16.0, gestures.right + 4),
-      16,
+    return EdgeInsets.only(
+      left: math.max(16.0, gestures.left + 4),
+      right: math.max(16.0, gestures.right + 4),
     );
   }
 
@@ -892,8 +1007,9 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 760),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(32, 16, 32, 16),
-                      child: _buildFields(context),
+                      padding: const EdgeInsets.only(top: 4, bottom: 16),
+                      child: _buildFields(context,
+                          side: const EdgeInsets.symmetric(horizontal: 32)),
                     ),
                   ),
                 ),
@@ -915,10 +1031,11 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
               if (_findOpen) _buildFindBar(context),
               Expanded(
                 child: Padding(
-                  padding: _phonePadding(context),
-                  child: _buildFields(context),
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _buildFields(context, side: _phoneSides(context)),
                 ),
               ),
+              if (_showKeyboardBar(context)) _buildKeyboardBar(context),
             ],
           ),
         ),
@@ -941,6 +1058,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
         bindings: {
           const SingleActivator(LogicalKeyboardKey.keyS, control: true):
               _manualSave,
+          // Ctrl+Y: rehacer (Ctrl+Z ya lo atiende el campo de texto).
+          const SingleActivator(LogicalKeyboardKey.keyY, control: true): _redo,
           // Ctrl+F dentro de la nota: buscar en esta nota.
           const SingleActivator(LogicalKeyboardKey.keyF, control: true):
               _openFind,

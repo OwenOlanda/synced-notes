@@ -185,6 +185,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const Divider(),
+          _SectionHeader(l10n.settingsSectionWriting),
+          ListenableBuilder(
+            listenable: widget.settings,
+            builder: (context, _) => SwitchListTile(
+              key: const ValueKey('auto-capitalize-switch'),
+              secondary: const Icon(Icons.text_fields),
+              title: Text(l10n.autoCapitalizeTitle),
+              subtitle: Text(l10n.autoCapitalizeDescription),
+              value: widget.settings.autoCapitalize,
+              onChanged: widget.settings.setAutoCapitalize,
+            ),
+          ),
+          const Divider(),
           _SectionHeader(l10n.settingsSectionNotesLocation),
           ListTile(
             leading: const Icon(Icons.folder_outlined),

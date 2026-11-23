@@ -256,4 +256,128 @@ void main() {
       expect(content(tester).highlights, isEmpty);
     });
   });
+
+  group('escritura', () {
+    final date = DateTime(2026, 11, 23, 16, 40);
+    final note = Note(
+      fileName: '2026-11-23_16-40-00 Frase.txt',
+      title: 'Frase',
+      content: 'Hola mundo grande',
+      createdAt: date,
+      modifiedAt: date,
+    );
+
+    Future<void> showNote(WidgetTester tester, {bool embedded = false}) async {
+      final editor = NoteEditorScreen(
+        note: note,
+        storage: FakeStorage(),
+        settings: settings,
+        embedded: embedded,
+        onClose: embedded ? () {} : null,
+      );
+      await tester.pumpWidget(localizedApp(
+        // En PC va dentro de otra pantalla; en el celular es la pantalla.
+        embedded ? Scaffold(body: editor) : editor,
+        locale: const Locale('es'),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Finder contentField() => find.byType(TextField).last;
+    TextEditingController content(WidgetTester tester) =>
+        tester.widget<TextField>(contentField()).controller!;
+
+    testWidgets('mayúscula automática según el ajuste', (tester) async {
+      await showNote(tester);
+      expect(tester.widget<TextField>(contentField()).textCapitalization,
+          TextCapitalization.sentences);
+      expect(tester.widget<TextField>(find.byType(TextField).first)
+          .textCapitalization, TextCapitalization.sentences);
+
+      await settings.setAutoCapitalize(false);
+      await showNote(tester);
+      expect(tester.widget<TextField>(contentField()).textCapitalization,
+          TextCapitalization.none);
+    });
+
+    testWidgets('celular: la barrita ↶ ↷ sale sobre el teclado y deshace',
+        (tester) async {
+      await showNote(tester);
+      // Flutter guarda el texto original en el historial medio segundo
+      // después de abrir la nota.
+      await tester.pump(const Duration(milliseconds: 600));
+      final bar = find.byKey(const ValueKey('keyboard-bar'));
+      expect(bar, findsNothing);
+
+      await tester.tap(contentField());
+      tester.view.viewInsets =
+          FakeViewPadding(bottom: 300 * tester.view.devicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(bar, findsOneWidget);
+
+      await tester.enterText(contentField(), 'Hola mundo grande!');
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.tap(find.byTooltip('Deshacer'));
+      await tester.pumpAndSettle();
+      expect(content(tester).text, 'Hola mundo grande');
+
+      await tester.tap(find.byTooltip('Rehacer'));
+      await tester.pumpAndSettle();
+      expect(content(tester).text, 'Hola mundo grande!');
+
+      // Sin teclado, la barrita no está.
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(bar, findsNothing);
+    });
+
+    testWidgets('PC: ↶ ↷ en la barra de la nota', (tester) async {
+      await showNote(tester, embedded: true);
+      expect(find.byTooltip('Deshacer (Ctrl+Z)'), findsOneWidget);
+      expect(find.byTooltip('Rehacer (Ctrl+Y)'), findsOneWidget);
+      expect(find.byKey(const ValueKey('keyboard-bar')), findsNothing);
+    });
+
+    testWidgets('tocar el margen a un lado del renglón pone el cursor en su orilla',
+        (tester) async {
+      await showNote(tester);
+      final editable =
+          tester.state<EditableTextState>(find.byType(EditableText).last)
+              .renderEditable;
+      final field = tester.getRect(contentField());
+      final lineY = editable
+          .localToGlobal(editable
+              .getLocalRectForCaret(const TextPosition(offset: 0))
+              .center)
+          .dy;
+      final textStart = editable
+          .localToGlobal(editable
+              .getLocalRectForCaret(const TextPosition(offset: 0))
+              .centerLeft)
+          .dx;
+      // El margen va dentro del campo: hay espacio en blanco a la izquierda.
+      expect(textStart - field.left, greaterThanOrEqualTo(16));
+
+      // En el espacio en blanco a la izquierda de "Hola": antes de la "H".
+      await tester.tap(contentField());
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tapAt(Offset(field.left + 4, lineY));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(content(tester).selection.baseOffset, 0);
+
+      // A la derecha de "grande": después de la última letra.
+      await tester.tapAt(Offset(field.right - 4, lineY));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(content(tester).selection.baseOffset, 17);
+
+      // Tocar la segunda letra deja el cursor ahí (nada de "imán").
+      final second = editable.localToGlobal(editable
+          .getLocalRectForCaret(const TextPosition(offset: 2))
+          .centerLeft);
+      await tester.tapAt(Offset(second.dx, lineY));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(content(tester).selection.baseOffset, 2);
+    });
+  });
 }

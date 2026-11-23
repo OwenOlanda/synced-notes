@@ -491,4 +491,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchWholeWord => 'Match whole word';
+
+  @override
+  String get settingsSectionWriting => 'Writing';
+
+  @override
+  String get autoCapitalizeTitle => 'Automatic capital letters';
+
+  @override
+  String get autoCapitalizeDescription =>
+      'Starts with a capital letter after a period or a line break. The phone keyboard applies it.';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get redo => 'Redo';
 }
