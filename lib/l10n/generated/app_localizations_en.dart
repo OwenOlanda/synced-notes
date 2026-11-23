@@ -482,4 +482,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchScopeChoose => 'Choose where to search';
+
+  @override
+  String get searchMatchCase => 'Match case';
+
+  @override
+  String get searchMatchAccents => 'Match accents';
+
+  @override
+  String get searchWholeWord => 'Match whole word';
 }

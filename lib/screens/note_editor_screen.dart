@@ -14,6 +14,7 @@ import '../widgets/app_message.dart';
 import '../widgets/blocked_chars_formatter.dart';
 import '../widgets/confirm_delete_dialog.dart';
 import '../widgets/find_highlight_controller.dart';
+import '../widgets/search_options_toggles.dart';
 import '../widgets/move_note_dialog.dart';
 
 enum _LeaveChoice { save, discard, cancel }
@@ -307,7 +308,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Recalcula los resultados. [fromStart]: empezar por el primero (al
   /// cambiar lo buscado); si no, conservar el número actual si aún existe.
   void _updateMatches({bool fromStart = false}) {
-    final search = NoteSearch(_findText.text);
+    final search =
+        NoteSearch(_findText.text, options: widget.settings.searchOptions);
     final matches = [
       for (final (s, e) in search.rangesIn(_title.text)) (true, s, e),
       for (final (s, e) in search.rangesIn(_content.text)) (false, s, e),
@@ -335,6 +337,14 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
         inTitle, current >= 0 && current < inTitle.length ? current : -1);
     _content.setHighlights(
         rangesOf(false), current >= inTitle.length ? current - inTitle.length : -1);
+  }
+
+  /// Se cambió Aa / á / ab: se recalcula (y se recuerda para la próxima).
+  Future<void> _setSearchOptions(SearchOptions options) async {
+    await widget.settings.setSearchOptions(options);
+    if (!mounted) return;
+    setState(() => _updateMatches());
+    _revealCurrent();
   }
 
   void _onFindChanged() {
@@ -780,7 +790,18 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
                 onEditingComplete: () {},
                 decoration: InputDecoration(
                   hintText: l10n.findInNote,
-                  prefixIcon: const Icon(Icons.search, size: 20),
+                  // En el celular no cabe la lupa junto a Aa / á / ab.
+                  prefixIcon: keys ? const Icon(Icons.search, size: 20) : null,
+                  contentPadding: keys
+                      ? const EdgeInsets.symmetric(vertical: 10)
+                      : const EdgeInsets.fromLTRB(12, 10, 0, 10),
+                  suffixIcon: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: SearchOptionsToggles(
+                      options: widget.settings.searchOptions,
+                      onChanged: _setSearchOptions,
+                    ),
+                  ),
                   isDense: true,
                   filled: true,
                   fillColor: scheme.surfaceContainerHighest,
@@ -788,7 +809,6 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
@@ -804,16 +824,19 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
             tooltip: keys
                 ? '${l10n.findPrevious} (Shift+Enter)'
                 : l10n.findPrevious,
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.keyboard_arrow_up),
             onPressed: hasMatches ? () => _goToMatch(-1) : null,
           ),
           IconButton(
             tooltip: keys ? '${l10n.findNext} (Enter)' : l10n.findNext,
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.keyboard_arrow_down),
             onPressed: hasMatches ? () => _goToMatch(1) : null,
           ),
           IconButton(
             tooltip: keys ? '${l10n.closeSearch} (Esc)' : l10n.closeSearch,
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.close),
             onPressed: _closeFind,
           ),

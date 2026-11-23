@@ -449,5 +449,17 @@
   "searchScopeChoose": "Choose where to search",
   "@searchScopeChoose": {
     "description": "Tooltip of the search scope (\"Searching in Recipes ▾\"), which opens a menu to search in another group."
+  },
+  "searchMatchCase": "Match case",
+  "@searchMatchCase": {
+    "description": "Tooltip of the \"Aa\" search option: uppercase and lowercase must match."
+  },
+  "searchMatchAccents": "Match accents",
+  "@searchMatchAccents": {
+    "description": "Tooltip of the \"á\" search option: accents must match (by default \"cancion\" finds \"canción\")."
+  },
+  "searchWholeWord": "Match whole word",
+  "@searchWholeWord": {
+    "description": "Tooltip of the \"ab\" search option: only whole words (\"sal\" does not find \"salsa\")."
   }
 }

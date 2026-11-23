@@ -877,6 +877,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose where to search'**
   String get searchScopeChoose;
+
+  /// Tooltip of the "Aa" search option: uppercase and lowercase must match.
+  ///
+  /// In en, this message translates to:
+  /// **'Match case'**
+  String get searchMatchCase;
+
+  /// Tooltip of the "á" search option: accents must match (by default "cancion" finds "canción").
+  ///
+  /// In en, this message translates to:
+  /// **'Match accents'**
+  String get searchMatchAccents;
+
+  /// Tooltip of the "ab" search option: only whole words ("sal" does not find "salsa").
+  ///
+  /// In en, this message translates to:
+  /// **'Match whole word'**
+  String get searchWholeWord;
 }
 
 class _AppLocalizationsDelegate

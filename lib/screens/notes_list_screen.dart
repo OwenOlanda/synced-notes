@@ -14,6 +14,7 @@ import '../widgets/group_dialogs.dart';
 import '../widgets/group_panel.dart';
 import '../widgets/group_sidebar.dart';
 import '../widgets/note_row.dart';
+import '../widgets/search_options_toggles.dart';
 import '../widgets/confirm_delete_dialog.dart';
 import '../widgets/move_note_dialog.dart';
 import 'note_editor_screen.dart';
@@ -92,7 +93,18 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// Dónde se busca ahora.
   GroupFilter get _scope => _searchScope ?? _filter;
 
-  NoteSearch get _search => NoteSearch(_searchText.text);
+  NoteSearch get _search => NoteSearch(_searchText.text,
+      options: widget.settings.searchOptions);
+
+  Future<void> _setSearchOptions(SearchOptions options) async {
+    await widget.settings.setSearchOptions(options);
+    if (!mounted) return;
+    setState(() {
+      // Cambian los resultados: todo vuelve a plegarse.
+      _expandedMatches.clear();
+      _shownMatches.clear();
+    });
+  }
 
   /// Resultados con varias coincidencias: cuáles están desplegados y cuántas
   /// coincidencias se ven de cada uno (de 10 en 10). Clave: [_noteKey].
@@ -342,13 +354,24 @@ class _NotesListScreenState extends State<NotesListScreen> {
         filled: wide,
         fillColor: theme.colorScheme.surfaceContainerHighest,
         prefixIcon: wide ? const Icon(Icons.search, size: 20) : null,
-        suffixIcon: _searchText.text.isEmpty
-            ? null
-            : IconButton(
+        // Opciones Aa / á / ab (como VS Code) y, si hay texto, borrarlo.
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SearchOptionsToggles(
+              options: widget.settings.searchOptions,
+              onChanged: _setSearchOptions,
+            ),
+            if (_searchText.text.isNotEmpty)
+              IconButton(
                 tooltip: l10n.clearSearch,
                 icon: const Icon(Icons.close, size: 20),
                 onPressed: _searchText.clear,
-              ),
+              )
+            else
+              const SizedBox(width: 8),
+          ],
+        ),
         border: wide
             ? OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),

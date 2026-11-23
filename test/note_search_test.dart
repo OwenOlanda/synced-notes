@@ -33,11 +33,51 @@ void main() {
     expect(NoteSearch('poema').matches(note), isFalse);
   });
 
-  test('varias palabras: todas, en cualquier orden, título o texto', () {
-    final note = _note('Receta', 'Agua con limón y miel');
-    expect(NoteSearch('receta limon').matches(note), isTrue);
-    expect(NoteSearch('miel receta').matches(note), isTrue);
-    expect(NoteSearch('receta naranja').matches(note), isFalse);
+  test('busca la frase tal cual, con sus espacios', () {
+    final note = _note('Libro', 'Pasó ante sus ojos. Antes de nada.');
+    expect(NoteSearch('ante s').rangesIn(note.content), [(5, 11)]);
+    expect(NoteSearch('sus ojos').matches(note), isTrue);
+    // Ya no son palabras sueltas en cualquier orden.
+    expect(NoteSearch('ojos sus').matches(note), isFalse);
+    // Los espacios al inicio y al final no cuentan (el teclado agrega uno).
+    expect(NoteSearch(' ante sus ').rangesIn(note.content), [(5, 13)]);
+    // Las comillas son texto normal.
+    expect(NoteSearch('"hola"').matches(_note('X', 'dijo "hola" y se fue')),
+        isTrue);
+  });
+
+  test('Aa: distinguir mayúsculas', () {
+    const aa = SearchOptions(matchCase: true);
+    final note = _note('X', 'Antes y ante');
+    expect(NoteSearch('ante', options: aa).rangesIn(note.content),
+        [(8, 12)]);
+    expect(NoteSearch('Ante', options: aa).rangesIn(note.content), [(0, 4)]);
+    // Sigue sin importar acentos: "Canción" con "Cancion".
+    expect(NoteSearch('Cancion', options: aa).matches(_note('Canción', '')),
+        isTrue);
+    expect(NoteSearch('cancion', options: aa).matches(_note('Canción', '')),
+        isFalse);
+  });
+
+  test('á: distinguir acentos', () {
+    const accents = SearchOptions(matchAccents: true);
+    final note = _note('X', 'limon y limón');
+    expect(NoteSearch('limón', options: accents).rangesIn(note.content),
+        [(8, 13)]);
+    // Sigue sin importar mayúsculas.
+    expect(NoteSearch('LIMÓN', options: accents).rangesIn(note.content),
+        [(8, 13)]);
+  });
+
+  test('ab: solo palabras completas', () {
+    const word = SearchOptions(wholeWord: true);
+    final note = _note('X', 'salsa, sal y sal.');
+    expect(NoteSearch('sal', options: word).rangesIn(note.content),
+        [(7, 10), (13, 16)]);
+    expect(NoteSearch('sal').rangesIn(note.content), hasLength(3));
+    // Las letras con acento también cuentan como letras.
+    expect(NoteSearch('cancio', options: word).matches(_note('X', 'canción')),
+        isFalse);
   });
 
   test('sabe si la coincidencia está en el título', () {
@@ -47,8 +87,8 @@ void main() {
   });
 
   test('rangos para resaltar, en el texto original y sin encimarse', () {
-    final search = NoteSearch('re receta');
-    expect(search.rangesIn('Una Receta'), [(4, 10)]);
+    expect(NoteSearch('receta').rangesIn('Una Receta'), [(4, 10)]);
+    expect(NoteSearch('aa').rangesIn('aaaa'), [(0, 2), (2, 4)]);
     expect(NoteSearch('limon').rangesIn('Limón y limón'), [(0, 5), (8, 13)]);
   });
 

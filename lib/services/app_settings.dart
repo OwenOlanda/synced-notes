@@ -3,12 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/group_filter.dart';
+import '../utils/note_search.dart';
 
 /// Ajustes de la app que se recuerdan entre sesiones:
 /// - si el autoguardado está activado;
 /// - el idioma elegido a mano (o ninguno = idioma del sistema);
 /// - qué grupo se estaba viendo en la lista;
-/// - el tema (claro, oscuro o el del sistema).
+/// - el tema (claro, oscuro o el del sistema);
+/// - las opciones de búsqueda (Aa, á, ab).
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._prefs);
 
@@ -18,6 +20,9 @@ class AppSettings extends ChangeNotifier {
   static const String _languageKey = 'language_code';
   static const String _selectedGroupKey = 'selected_group';
   static const String _themeModeKey = 'theme_mode';
+  static const String _searchCaseKey = 'search_match_case';
+  static const String _searchAccentsKey = 'search_match_accents';
+  static const String _searchWholeWordKey = 'search_whole_word';
 
   static Future<AppSettings> load() async =>
       AppSettings._(await SharedPreferences.getInstance());
@@ -64,6 +69,21 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> setThemeMode(ThemeMode mode) async {
     await _prefs.setString(_themeModeKey, mode.name);
+    notifyListeners();
+  }
+
+  /// Opciones de búsqueda (Aa, á, ab), las mismas para la lista y para
+  /// "Buscar en esta nota". Por defecto, todas apagadas.
+  SearchOptions get searchOptions => SearchOptions(
+        matchCase: _prefs.getBool(_searchCaseKey) ?? false,
+        matchAccents: _prefs.getBool(_searchAccentsKey) ?? false,
+        wholeWord: _prefs.getBool(_searchWholeWordKey) ?? false,
+      );
+
+  Future<void> setSearchOptions(SearchOptions options) async {
+    await _prefs.setBool(_searchCaseKey, options.matchCase);
+    await _prefs.setBool(_searchAccentsKey, options.matchAccents);
+    await _prefs.setBool(_searchWholeWordKey, options.wholeWord);
     notifyListeners();
   }
 }

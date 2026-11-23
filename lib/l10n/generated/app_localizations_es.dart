@@ -483,4 +483,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get searchScopeChoose => 'Elegir dónde buscar';
+
+  @override
+  String get searchMatchCase => 'Distinguir mayúsculas y minúsculas';
+
+  @override
+  String get searchMatchAccents => 'Distinguir acentos';
+
+  @override
+  String get searchWholeWord => 'Solo palabras completas';
 }

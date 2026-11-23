@@ -609,7 +609,7 @@ void main() {
       expect(find.byType(GroupPanel), findsNothing);
     });
 
-    testWidgets('sin importar acentos ni mayúsculas; varias palabras',
+    testWidgets('sin importar acentos ni mayúsculas; busca la frase tal cual',
         (tester) async {
       await showList(tester, notes: notes, groups: groups);
       await tester.tap(find.byTooltip('Buscar notas'));
@@ -619,10 +619,11 @@ void main() {
       expect(find.text('Querida tía'), findsOneWidget);
       expect(find.text('Tacos'), findsNothing);
 
-      await search(tester, 'leche pan');
+      await search(tester, 'leche y');
       expect(find.text('Suelta'), findsOneWidget);
-      await search(tester, 'leche carne');
-      expect(find.text('Ninguna nota coincide con "leche carne"'),
+      // Ya no son palabras sueltas: "leche pan" no está tal cual.
+      await search(tester, 'leche pan');
+      expect(find.text('Ninguna nota coincide con "leche pan"'),
           findsOneWidget);
     });
 
@@ -642,6 +643,32 @@ void main() {
       expect(find.text('Querida tía'), findsOneWidget);
       expect(scopeText(tester), 'Buscando en todas las notas');
       expect(find.text('Solo en Recetas'), findsOneWidget);
+    });
+
+    testWidgets('los botones Aa / á / ab cambian los resultados y se recuerdan',
+        (tester) async {
+      final mixed = [
+        _note(title: 'Salsa', content: 'roja'),
+        _note(title: 'Sal', content: 'de mar'),
+      ];
+      await showList(tester, notes: mixed, groups: groups);
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      await search(tester, 'sal');
+      expect(find.text('Salsa'), findsOneWidget);
+      expect(find.text('Sal'), findsOneWidget);
+
+      // ab: solo "Sal" (palabra completa).
+      await tester.tap(find.byKey(const ValueKey('search-option-word')));
+      await tester.pumpAndSettle();
+      expect(find.text('Salsa'), findsNothing);
+      expect(find.text('Sal'), findsOneWidget);
+      expect(settings.searchOptions.wholeWord, isTrue);
+
+      // Aa: "sal" en minúsculas ya no encuentra "Sal".
+      await tester.tap(find.byKey(const ValueKey('search-option-case')));
+      await tester.pumpAndSettle();
+      expect(find.text('Ninguna nota coincide con "sal"'), findsOneWidget);
     });
 
     testWidgets('con el buscador vacío, "Buscar en todas" muestra todas',
