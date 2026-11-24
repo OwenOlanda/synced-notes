@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
 import '../models/note.dart';
+import '../services/app_settings.dart' show NoteOpenPosition;
 import '../utils/date_text.dart';
 import '../utils/note_search.dart';
 import 'group_colors.dart';
@@ -33,6 +34,8 @@ class NoteRow extends StatelessWidget {
     this.pinned = false,
     this.selectionMode = false,
     this.checked = false,
+    this.preview = NoteOpenPosition.start,
+    this.fromChar,
     this.search,
     this.matchesExpanded = false,
     this.matchesShown = 10,
@@ -64,6 +67,14 @@ class NoteRow extends StatelessWidget {
   /// a la izquierda, marcado si [checked].
   final bool selectionMode;
   final bool checked;
+
+  /// Qué parte del texto se ve (sin buscar): el principio, el final o
+  /// ([NoteOpenPosition.cursor] / [NoteOpenPosition.scroll]) desde el
+  /// renglón de la letra [fromChar]
+  /// (donde se dejó el cursor o lo que estaba arriba en pantalla; si no se
+  /// sabe, el principio).
+  final NoteOpenPosition preview;
+  final int? fromChar;
 
   /// Buscando: las coincidencias están desplegadas, y cuántas se ven.
   final bool matchesExpanded;
@@ -240,11 +251,10 @@ class NoteRow extends StatelessWidget {
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Expanded(
-                          child: _highlighted(
+                          child: _buildPreview(
                             context,
-                            previewOf(note, l10n,
-                                text: search?.snippetOf(note)),
-                            style: theme.textTheme.bodyMedium?.copyWith(
+                            l10n,
+                            theme.textTheme.bodyMedium?.copyWith(
                               color: muted,
                               fontStyle: note.content.trim().isEmpty
                                   ? FontStyle.italic
@@ -405,6 +415,59 @@ class NoteRow extends StatelessWidget {
     );
   }
 
+  /// La vista previa: buscando, el pedazo que coincide; si no, según
+  /// [preview].
+  Widget _buildPreview(
+      BuildContext context, AppLocalizations l10n, TextStyle? style) {
+    final content = note.content;
+    if (search != null || content.trim().isEmpty) {
+      return _highlighted(
+          context, previewOf(note, l10n, text: search?.snippetOf(note)),
+          style: style);
+    }
+    String? text;
+    switch (preview) {
+      case NoteOpenPosition.start:
+        text = previewOf(note, l10n);
+      case NoteOpenPosition.cursor:
+      case NoteOpenPosition.scroll:
+        final at = fromChar;
+        // Sin posición guardada: el principio. En un renglón vacío al
+        // final: el final.
+        text = at == null ? previewOf(note, l10n) : previewFromLine(content, at);
+      case NoteOpenPosition.end:
+        break;
+    }
+    if (text != null) {
+      return Text(text,
+          key: const ValueKey('note-preview'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: style);
+    }
+    return _TailPreview(content, style: style);
+  }
+
+  /// Desde el principio del renglón donde está [cursor] ("… " si hay texto
+  /// antes). `null` si de ahí en adelante no hay nada (entonces conviene
+  /// mostrar el final).
+  static String? previewFromLine(String content, int cursor) {
+    cursor = cursor.clamp(0, content.length);
+    final lineStart =
+        cursor == 0 ? 0 : content.lastIndexOf('\n', cursor - 1) + 1;
+    final rest = content.substring(lineStart).trim();
+    if (rest.isEmpty) return null;
+    final before = content.substring(0, lineStart).trim().isNotEmpty;
+    final start = rest.length > 200
+        ? rest.substring(0, NoteSearch.safeCut(rest, 200))
+        : rest;
+    return '${before ? '… ' : ''}${oneLine(start)}';
+  }
+
+  /// Los renglones unidos con " · ".
+  static String oneLine(String text) =>
+      text.replaceAll(RegExp(r'\s*\n\s*'), ' · ');
+
   /// Inicio del texto (o [text], si se da: un pedazo), en una sola línea.
   static String previewOf(Note note, AppLocalizations l10n, {String? text}) {
     text = (text ?? note.content).trim();
@@ -412,6 +475,69 @@ class NoteRow extends StatelessWidget {
     final start = text.length > 200
         ? text.substring(0, NoteSearch.safeCut(text, 200))
         : text;
-    return start.replaceAll(RegExp(r'\s*\n\s*'), ' · ');
+    return oneLine(start);
   }
+}
+
+/// El final del texto en una sola línea: "… lo último que se escribió".
+/// Se mide cuánto cabe para que se corte al principio y no al final.
+class _TailPreview extends StatelessWidget {
+  const _TailPreview(this.content, {required this.style});
+
+  final String content;
+  final TextStyle? style;
+
+  /// Cuánto del final se considera (de sobra para un renglón).
+  static const int _window = 400;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = content.trim();
+    var start = math.max(0, text.length - _window);
+    // No partir un emoji (par de mitades UTF-16).
+    if (start > 0 && _isLowSurrogate(text.codeUnitAt(start))) start++;
+    final tail = NoteRow.oneLine(text.substring(start));
+    final cut = start > 0;
+    final effective = DefaultTextStyle.of(context).style.merge(style);
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    return LayoutBuilder(builder: (context, constraints) {
+      final painter = TextPainter(
+        textDirection: direction,
+        textScaler: scaler,
+        maxLines: 1,
+      );
+      bool fits(String s) {
+        painter.text = TextSpan(text: s, style: effective);
+        painter.layout();
+        return painter.width <= constraints.maxWidth;
+      }
+
+      String shown;
+      if (!cut && fits(tail)) {
+        shown = tail;
+      } else {
+        // El pedazo más largo del final que cabe después de "… ".
+        var lo = 0, hi = tail.length;
+        while (lo < hi) {
+          final mid = (lo + hi) ~/ 2;
+          if (fits('… ${tail.substring(mid)}')) {
+            hi = mid;
+          } else {
+            lo = mid + 1;
+          }
+        }
+        if (lo < tail.length && _isLowSurrogate(tail.codeUnitAt(lo))) lo++;
+        shown = '… ${tail.substring(lo).trimLeft()}';
+      }
+      painter.dispose();
+      return Text(shown,
+          key: const ValueKey('note-preview'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: style);
+    });
+  }
+
+  static bool _isLowSurrogate(int unit) => unit >= 0xDC00 && unit <= 0xDFFF;
 }

@@ -492,7 +492,25 @@ void main() {
       expect(contentOf(tester).selection.baseOffset, long.content.length);
     });
 
-    testWidgets('"Donde me quedé" regresa al mismo lugar', (tester) async {
+    testWidgets('"Donde dejé el cursor" abre con ese renglón a la vista',
+        (tester) async {
+      await settings.setNoteOpenPosition(NoteOpenPosition.cursor);
+      await showLong(tester);
+      // El cursor muy abajo, sin desplazar la nota.
+      contentOf(tester).selection =
+          const TextSelection.collapsed(offset: 1500);
+      await tester.pump();
+      await tester
+          .state<NoteEditorScreenState>(find.byType(NoteEditorScreen))
+          .prepareToLeave();
+      await tester.pumpWidget(const SizedBox());
+      await showLong(tester);
+      expect(contentOf(tester).selection.baseOffset, 1500);
+      expect(scrollOf(tester).offset, greaterThan(0));
+    });
+
+    testWidgets('"Donde dejé de leer" (por defecto) regresa al mismo lugar',
+        (tester) async {
       await showLong(tester);
       expect(scrollOf(tester).offset, 0);
       await tester.drag(find.byType(TextField).last, const Offset(0, -500));

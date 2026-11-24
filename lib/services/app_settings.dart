@@ -29,6 +29,7 @@ class AppSettings extends ChangeNotifier {
   static const String _autoCapitalizeKey = 'auto_capitalize';
   static const String _openPositionKey = 'note_open_position';
   static const String _positionsKey = 'note_positions';
+  static const String _listPreviewKey = 'list_preview';
   static const String _searchCaseKey = 'search_match_case';
   static const String _searchAccentsKey = 'search_match_accents';
   static const String _searchWholeWordKey = 'search_whole_word';
@@ -116,13 +117,42 @@ class AppSettings extends ChangeNotifier {
       switch (_prefs.getString(_openPositionKey)) {
         'start' => NoteOpenPosition.start,
         'end' => NoteOpenPosition.end,
-        _ => NoteOpenPosition.last,
+        'cursor' => NoteOpenPosition.cursor,
+        // Por defecto (y el "Donde me quedé" de antes, 'last'): como se veía.
+        _ => NoteOpenPosition.scroll,
       };
 
   Future<void> setNoteOpenPosition(NoteOpenPosition position) async {
     await _prefs.setString(_openPositionKey, position.name);
     notifyListeners();
   }
+
+  /// Qué parte del texto se ve en la lista (por omisión, igual que "Al
+  /// abrir una nota").
+  ListPreview get listPreview => switch (_prefs.getString(_listPreviewKey)) {
+        'start' => ListPreview.start,
+        'end' => ListPreview.end,
+        'cursor' => ListPreview.cursor,
+        'scroll' => ListPreview.scroll,
+        _ => ListPreview.sameAsOpen,
+      };
+
+  Future<void> setListPreview(ListPreview preview) async {
+    await _prefs.setString(_listPreviewKey, preview.name);
+    notifyListeners();
+  }
+
+  /// La vista previa que toca (nunca [ListPreview.sameAsOpen]): si es
+  /// "igual que al abrir", la de [noteOpenPosition].
+  ListPreview get effectiveListPreview => switch (listPreview) {
+        ListPreview.sameAsOpen => switch (noteOpenPosition) {
+            NoteOpenPosition.start => ListPreview.start,
+            NoteOpenPosition.end => ListPreview.end,
+            NoteOpenPosition.cursor => ListPreview.cursor,
+            NoteOpenPosition.scroll => ListPreview.scroll,
+          },
+        final other => other,
+      };
 
   /// Zoom del texto de las notas (título y texto): de [minTextZoom] a
   /// [maxTextZoom], en pasos de [textZoomStep]. 1.0 = 100 % (por defecto).
@@ -226,10 +256,16 @@ class AppSettings extends ChangeNotifier {
     while (positions.length > maxRememberedPositions) {
       positions.remove(positions.keys.first);
     }
+    _positionsCache = positions;
     await _prefs.setString(_positionsKey, jsonEncode(positions));
   }
 
-  Map<String, dynamic> _positions() {
+  /// Ya leídas (la lista pregunta por cada nota al dibujarse).
+  Map<String, dynamic>? _positionsCache;
+
+  Map<String, dynamic> _positions() => _positionsCache ??= _readPositions();
+
+  Map<String, dynamic> _readPositions() {
     final raw = _prefs.getString(_positionsKey);
     if (raw == null) return <String, dynamic>{};
     try {
@@ -242,7 +278,15 @@ class AppSettings extends ChangeNotifier {
 }
 
 /// Dónde se abre una nota.
-enum NoteOpenPosition { start, end, last }
+/// - [cursor]: con el cursor donde se dejó, y ese renglón a la vista.
+/// - [scroll]: como se veía (lo de arriba en pantalla, hasta donde se
+///   leyó); el cursor también donde se dejó.
+enum NoteOpenPosition { start, end, cursor, scroll }
+
+/// Qué parte del texto se ve en la lista de notas: igual que al abrir,
+/// el principio, el final, desde el renglón donde se dejó el cursor o
+/// desde lo que estaba arriba en pantalla (hasta donde se leyó).
+enum ListPreview { sameAsOpen, start, end, cursor, scroll }
 
 /// Orden de la lista de notas.
 enum NoteOrder {

@@ -787,6 +787,8 @@ class _NotesListScreenState extends State<NotesListScreen>
         notesFolder: widget.storage.folder,
       ),
     ));
+    // Pudo cambiar algo de cómo se ve la lista (ej. la vista previa).
+    if (mounted) setState(() {});
   }
 
   // ---------------------------------------------------------------------------
@@ -1997,12 +1999,27 @@ class _NotesListScreenState extends State<NotesListScreen>
         }
         final note = item as Note;
         final group = note.group;
+        final preview = widget.settings.effectiveListPreview;
         return MetaData(
           metaData: _NoteHit(note),
           behavior: HitTestBehavior.translucent,
           child: NoteRow(
           pinned: _isPinnedIn(note, scope),
           note: note,
+          preview: switch (preview) {
+            ListPreview.end => NoteOpenPosition.end,
+            ListPreview.cursor || ListPreview.scroll => NoteOpenPosition.cursor,
+            _ => NoteOpenPosition.start,
+          },
+          fromChar: switch (preview) {
+            ListPreview.cursor => widget.settings
+                .notePositionOf(note.createdAt.toIso8601String())
+                ?.cursor,
+            ListPreview.scroll => widget.settings
+                .notePositionOf(note.createdAt.toIso8601String())
+                ?.topChar,
+            _ => null,
+          },
           groupColor: group == null ? null : _colorOf(group, theme),
           showGroup: showGroup,
           selected: _isOpenInPane(note),

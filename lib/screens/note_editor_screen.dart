@@ -254,7 +254,9 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
   }
 
   /// Desplaza el texto para que la letra [char] quede hasta arriba.
-  void _scrollToChar(int char) {
+  /// [above]: cuánto de la pantalla dejar arriba de esa letra (0 = la
+  /// letra hasta arriba; 0.3 = a un tercio).
+  void _scrollToChar(int char, {double above = 0}) {
     if (!_scrollReady) return;
     final editable = _contentEditable()?.renderEditable;
     if (editable == null || !editable.hasSize) return;
@@ -266,7 +268,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
     final y = top == 0
         ? 0.0
         : editable.getLocalRectForCaret(TextPosition(offset: top)).top +
-            scroll.pixels;
+            scroll.pixels -
+            scroll.viewportDimension * above;
     _anchoring = true;
     _contentScroll.jumpTo(y.clamp(0.0, scroll.maxScrollExtent).toDouble());
     _anchoring = false;
@@ -308,16 +311,23 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
       case NoteOpenPosition.end:
         _content.selection = TextSelection.collapsed(offset: text.length);
         _contentScroll.jumpTo(scroll.maxScrollExtent);
-      case NoteOpenPosition.last:
+      case NoteOpenPosition.cursor:
+      case NoteOpenPosition.scroll:
         final saved = widget.settings.notePositionOf(_positionId);
         if (saved == null) {
           _content.selection = const TextSelection.collapsed(offset: 0);
           return;
         }
-        _content.selection = TextSelection.collapsed(
-            offset: NoteSearch.safeCut(
-                text, saved.cursor.clamp(0, text.length).toInt()));
-        _scrollToChar(saved.topChar);
+        final cursor = NoteSearch.safeCut(
+            text, saved.cursor.clamp(0, text.length).toInt());
+        _content.selection = TextSelection.collapsed(offset: cursor);
+        if (widget.settings.noteOpenPosition == NoteOpenPosition.cursor) {
+          // El renglón del cursor a un tercio de la pantalla (con un poco
+          // de lo de antes a la vista).
+          _scrollToChar(cursor, above: 0.3);
+        } else {
+          _scrollToChar(saved.topChar);
+        }
     }
   }
 

@@ -151,4 +151,48 @@ void main() {
     expect(settings.themeMode, ThemeMode.dark);
     expect(find.text('Oscuro'), findsOneWidget); // ahora es el actual
   });
+
+  testWidgets('vista previa en la lista: por defecto igual que al abrir',
+      (tester) async {
+    await showSettings(tester, isWindows: false);
+    final tile = find.byKey(const ValueKey('list-preview-tile'));
+    await tester.scrollUntilVisible(tile, 100,
+        scrollable: find.byType(Scrollable).first);
+    expect(
+        find.descendant(
+            of: tile,
+            matching:
+                find.text('Igual que al abrir una nota (Donde estaba leyendo)')),
+        findsOneWidget);
+
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    // Cada opción explica qué muestra.
+    expect(find.text('Las últimas líneas de la nota.'), findsOneWidget);
+    expect(find.text('Ahora: Donde estaba leyendo.'), findsOneWidget);
+    await tester.tap(find.text('El final'));
+    await tester.pumpAndSettle();
+    expect(settings.listPreview, ListPreview.end);
+    expect(find.descendant(of: tile, matching: find.text('El final')),
+        findsOneWidget);
+  });
+
+  testWidgets('al abrir una nota: cada opción con su explicación',
+      (tester) async {
+    await showSettings(tester, isWindows: false);
+    final tile = find.byKey(const ValueKey('open-position-tile'));
+    await tester.scrollUntilVisible(tile, 100,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.descendant(of: tile, matching: find.text('Donde estaba leyendo')),
+        findsOneWidget);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(find.text('La nota se ve igual que cuando la cerraste.'),
+        findsOneWidget);
+    expect(find.text('Cada dispositivo recuerda su propio lugar en cada nota.'),
+        findsOneWidget);
+    await tester.tap(find.text('Donde estaba escribiendo'));
+    await tester.pumpAndSettle();
+    expect(settings.noteOpenPosition, NoteOpenPosition.cursor);
+  });
 }

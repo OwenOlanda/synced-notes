@@ -1867,4 +1867,67 @@ void main() {
       expect(settings.selectedGroup, GroupFilter.all);
     });
   });
+
+  group('vista previa en la lista', () {
+    String previewText(WidgetTester tester) =>
+        tester.widget<Text>(find.byKey(const ValueKey('note-preview'))).data!;
+
+    test('desde el renglón del cursor', () {
+      const text = 'Primero\nSegundo renglón\nTercero';
+      expect(NoteRow.previewFromLine(text, 0), 'Primero · Segundo renglón · Tercero');
+      expect(NoteRow.previewFromLine(text, 12), '… Segundo renglón · Tercero');
+      // Cursor en un renglón vacío al final: no hay nada (se usa el final).
+      expect(NoteRow.previewFromLine('Hola\n', 5), isNull);
+    });
+
+    testWidgets('"El final": se ve lo último, cortado al principio',
+        (tester) async {
+      await settings.setListPreview(ListPreview.end);
+      final content = 'Inicio de la nota\n${'palabra ' * 200}\nFinal del texto';
+      await showList(tester, notes: [_note(title: 'Larga', content: content)]);
+      final shown = previewText(tester);
+      expect(shown, startsWith('… '));
+      expect(shown, endsWith('Final del texto'));
+    });
+
+    testWidgets('"Donde dejé el cursor": desde el renglón del cursor',
+        (tester) async {
+      await settings.setListPreview(ListPreview.cursor);
+      final note = _note(
+          title: 'Lista', content: 'Primero\nSegundo renglón\nTercero');
+      await settings.setNotePosition(note.createdAt.toIso8601String(),
+          const NotePosition(cursor: 12, topChar: 0));
+      await showList(tester, notes: [note]);
+      expect(previewText(tester), '… Segundo renglón · Tercero');
+    });
+
+    testWidgets('"Donde dejé de leer": desde lo que estaba arriba en pantalla',
+        (tester) async {
+      await settings.setListPreview(ListPreview.scroll);
+      final note = _note(
+          title: 'Lista', content: 'Primero\nSegundo renglón\nTercero');
+      await settings.setNotePosition(note.createdAt.toIso8601String(),
+          const NotePosition(cursor: 2, topChar: 30));
+      await showList(tester, notes: [note]);
+      expect(previewText(tester), '… Tercero');
+    });
+
+    testWidgets('sin posición guardada: el principio', (tester) async {
+      await settings.setListPreview(ListPreview.cursor);
+      await showList(tester, notes: [
+        _note(title: 'Lista', content: 'Primero\nSegundo renglón'),
+      ]);
+      expect(previewText(tester), 'Primero · Segundo renglón');
+    });
+
+    testWidgets('por defecto sigue a "Al abrir una nota"', (tester) async {
+      await settings.setNoteOpenPosition(NoteOpenPosition.start);
+      final note = _note(
+          title: 'Lista', content: 'Primero\nSegundo renglón\nTercero');
+      await settings.setNotePosition(note.createdAt.toIso8601String(),
+          const NotePosition(cursor: 12, topChar: 0));
+      await showList(tester, notes: [note]);
+      expect(previewText(tester), 'Primero · Segundo renglón · Tercero');
+    });
+  });
 }

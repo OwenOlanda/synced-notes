@@ -518,9 +518,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openPositionEnd => 'At the end';
 
   @override
-  String get openPositionLast => 'Where I left off';
-
-  @override
   String get scrollToTop => 'Go to top';
 
   @override
@@ -695,4 +692,64 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get listPreviewTitle => 'Text shown in the list';
+
+  @override
+  String get listPreviewSameAsOpen => 'Same as when opening a note';
+
+  @override
+  String get listPreviewStart => 'The beginning';
+
+  @override
+  String get listPreviewEnd => 'The end';
+
+  @override
+  String get positionCursor => 'Where I was writing';
+
+  @override
+  String get positionScroll => 'Where I was reading';
+
+  @override
+  String get openPositionStartHint => 'Always from the first line.';
+
+  @override
+  String get openPositionEndHint =>
+      'Always on the last line, ready to keep writing.';
+
+  @override
+  String get openPositionScrollHint =>
+      'The note looks just like when you closed it.';
+
+  @override
+  String get openPositionCursorHint => 'On the line where you left the cursor.';
+
+  @override
+  String listPreviewSameAsOpenNow(String position) {
+    return 'Same as when opening a note ($position)';
+  }
+
+  @override
+  String listPreviewSameAsOpenHint(String position) {
+    return 'Now: $position.';
+  }
+
+  @override
+  String get listPreviewStartHint => 'The first lines of the note.';
+
+  @override
+  String get listPreviewEndHint => 'The last lines of the note.';
+
+  @override
+  String get listPreviewScrollHint =>
+      'What was at the top when you closed the note.';
+
+  @override
+  String get listPreviewCursorHint =>
+      'From the line where you left the cursor.';
+
+  @override
+  String get positionPerDeviceNote =>
+      'Each device remembers its own place in each note.';
 }

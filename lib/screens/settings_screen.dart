@@ -97,27 +97,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
       switch (position) {
         NoteOpenPosition.start => l10n.openPositionStart,
         NoteOpenPosition.end => l10n.openPositionEnd,
-        NoteOpenPosition.last => l10n.openPositionLast,
+        NoteOpenPosition.cursor => l10n.positionCursor,
+        NoteOpenPosition.scroll => l10n.positionScroll,
       };
 
-  /// "Al abrir una nota": al principio / al final / donde me quedé.
+  String _openPositionHint(
+          AppLocalizations l10n, NoteOpenPosition position) =>
+      switch (position) {
+        NoteOpenPosition.start => l10n.openPositionStartHint,
+        NoteOpenPosition.end => l10n.openPositionEndHint,
+        NoteOpenPosition.cursor => l10n.openPositionCursorHint,
+        NoteOpenPosition.scroll => l10n.openPositionScrollHint,
+      };
+
+  /// El nombre corto (en el ajuste ya elegido).
+  String _listPreviewLabel(AppLocalizations l10n, ListPreview preview) =>
+      switch (preview) {
+        ListPreview.sameAsOpen => l10n.listPreviewSameAsOpenNow(
+            _openPositionLabel(l10n, widget.settings.noteOpenPosition)),
+        ListPreview.start => l10n.listPreviewStart,
+        ListPreview.end => l10n.listPreviewEnd,
+        ListPreview.cursor => l10n.positionCursor,
+        ListPreview.scroll => l10n.positionScroll,
+      };
+
+  String _listPreviewHint(AppLocalizations l10n, ListPreview preview) =>
+      switch (preview) {
+        ListPreview.sameAsOpen => l10n.listPreviewSameAsOpenHint(
+            _openPositionLabel(l10n, widget.settings.noteOpenPosition)),
+        ListPreview.start => l10n.listPreviewStartHint,
+        ListPreview.end => l10n.listPreviewEndHint,
+        ListPreview.cursor => l10n.listPreviewCursorHint,
+        ListPreview.scroll => l10n.listPreviewScrollHint,
+      };
+
+  /// Ventanita para elegir una opción: cada una con su explicación corta
+  /// debajo, la elegida con ✓ y, al final, una nota opcional.
+  Future<T?> _choose<T>({
+    required String title,
+    required T current,
+    required List<(T, String, String)> options,
+    String? footer,
+  }) {
+    return showDialog<T>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SimpleDialog(
+          title: Text(title),
+          children: [
+            for (final (value, label, hint) in options)
+              ListTile(
+                title: Text(label),
+                subtitle: Text(hint),
+                trailing: value == current ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(context).pop(value),
+              ),
+            if (footer != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+                child: Text(
+                  footer,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// "Texto que se ve en la lista": igual que al abrir / el principio /
+  /// el final / donde estaba leyendo / donde estaba escribiendo.
+  Future<void> _chooseListPreview() async {
+    final l10n = context.l10n;
+    final choice = await _choose<ListPreview>(
+      title: l10n.listPreviewTitle,
+      current: widget.settings.listPreview,
+      options: [
+        for (final preview in const [
+          ListPreview.sameAsOpen,
+          ListPreview.scroll,
+          ListPreview.cursor,
+          ListPreview.start,
+          ListPreview.end,
+        ])
+          (
+            preview,
+            preview == ListPreview.sameAsOpen
+                ? l10n.listPreviewSameAsOpen
+                : _listPreviewLabel(l10n, preview),
+            _listPreviewHint(l10n, preview),
+          ),
+      ],
+      footer: l10n.positionPerDeviceNote,
+    );
+    if (choice == null) return;
+    await widget.settings.setListPreview(choice);
+  }
+
+  /// "Al abrir una nota": al principio / al final / donde estaba leyendo /
+  /// donde estaba escribiendo.
   Future<void> _chooseOpenPosition() async {
     final l10n = context.l10n;
-    final current = widget.settings.noteOpenPosition;
-    final choice = await showDialog<NoteOpenPosition>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(l10n.openPositionTitle),
-        children: [
-          for (final position in NoteOpenPosition.values)
-            ListTile(
-              title: Text(_openPositionLabel(l10n, position)),
-              trailing:
-                  position == current ? const Icon(Icons.check) : null,
-              onTap: () => Navigator.of(context).pop(position),
-            ),
-        ],
-      ),
+    // En el orden en que más se usan: leyendo (por defecto) primero.
+    const order = [
+      NoteOpenPosition.scroll,
+      NoteOpenPosition.cursor,
+      NoteOpenPosition.start,
+      NoteOpenPosition.end,
+    ];
+    final choice = await _choose<NoteOpenPosition>(
+      title: l10n.openPositionTitle,
+      current: widget.settings.noteOpenPosition,
+      options: [
+        for (final position in order)
+          (
+            position,
+            _openPositionLabel(l10n, position),
+            _openPositionHint(l10n, position),
+          ),
+      ],
+      footer: l10n.positionPerDeviceNote,
     );
     if (choice == null) return;
     await widget.settings.setNoteOpenPosition(choice);
@@ -300,6 +402,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: Text(_openPositionLabel(
                   l10n, widget.settings.noteOpenPosition)),
               onTap: _chooseOpenPosition,
+            ),
+          ),
+          ListenableBuilder(
+            listenable: widget.settings,
+            builder: (context, _) => ListTile(
+              key: const ValueKey('list-preview-tile'),
+              leading: const Icon(Icons.short_text),
+              title: Text(l10n.listPreviewTitle),
+              subtitle: Text(
+                  _listPreviewLabel(l10n, widget.settings.listPreview)),
+              onTap: _chooseListPreview,
             ),
           ),
           ListenableBuilder(

@@ -944,12 +944,6 @@ abstract class AppLocalizations {
   /// **'At the end'**
   String get openPositionEnd;
 
-  /// Option of openPositionTitle (default): the scroll and cursor position of the last visit, on this device.
-  ///
-  /// In en, this message translates to:
-  /// **'Where I left off'**
-  String get openPositionLast;
-
   /// Tooltip of the round button that jumps to the beginning of the note.
   ///
   /// In en, this message translates to:
@@ -1207,6 +1201,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 note moved to \"No group\"} other{{count} notes moved to \"No group\"}}'**
   String notesMovedToNone(int count);
+
+  /// Setting: which part of each note's text shows under its title in the note list.
+  ///
+  /// In en, this message translates to:
+  /// **'Text shown in the list'**
+  String get listPreviewTitle;
+
+  /// Option of listPreviewTitle (default): follows the openPositionTitle setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as when opening a note'**
+  String get listPreviewSameAsOpen;
+
+  /// Option of listPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The beginning'**
+  String get listPreviewStart;
+
+  /// Option of listPreviewTitle: the last lines of the note.
+  ///
+  /// In en, this message translates to:
+  /// **'The end'**
+  String get listPreviewEnd;
+
+  /// Option of openPositionTitle and listPreviewTitle: the line where the cursor was left.
+  ///
+  /// In en, this message translates to:
+  /// **'Where I was writing'**
+  String get positionCursor;
+
+  /// Option of openPositionTitle (default) and listPreviewTitle: the scroll position (the line at the top of the screen when the note was closed).
+  ///
+  /// In en, this message translates to:
+  /// **'Where I was reading'**
+  String get positionScroll;
+
+  /// Explanation under openPositionStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Always from the first line.'**
+  String get openPositionStartHint;
+
+  /// Explanation under openPositionEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Always on the last line, ready to keep writing.'**
+  String get openPositionEndHint;
+
+  /// Explanation under positionScroll when choosing where notes open.
+  ///
+  /// In en, this message translates to:
+  /// **'The note looks just like when you closed it.'**
+  String get openPositionScrollHint;
+
+  /// Explanation under positionCursor when choosing where notes open.
+  ///
+  /// In en, this message translates to:
+  /// **'On the line where you left the cursor.'**
+  String get openPositionCursorHint;
+
+  /// Current value of listPreviewTitle when it follows openPositionTitle; position = that setting's option.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as when opening a note ({position})'**
+  String listPreviewSameAsOpenNow(String position);
+
+  /// Explanation under listPreviewSameAsOpen: what it currently means.
+  ///
+  /// In en, this message translates to:
+  /// **'Now: {position}.'**
+  String listPreviewSameAsOpenHint(String position);
+
+  /// Explanation under listPreviewStart.
+  ///
+  /// In en, this message translates to:
+  /// **'The first lines of the note.'**
+  String get listPreviewStartHint;
+
+  /// Explanation under listPreviewEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'The last lines of the note.'**
+  String get listPreviewEndHint;
+
+  /// Explanation under positionScroll in the list preview setting.
+  ///
+  /// In en, this message translates to:
+  /// **'What was at the top when you closed the note.'**
+  String get listPreviewScrollHint;
+
+  /// Explanation under positionCursor in the list preview setting.
+  ///
+  /// In en, this message translates to:
+  /// **'From the line where you left the cursor.'**
+  String get listPreviewCursorHint;
+
+  /// Note at the bottom of the open-position and list-preview choices: places are saved per device, not synced.
+  ///
+  /// In en, this message translates to:
+  /// **'Each device remembers its own place in each note.'**
+  String get positionPerDeviceNote;
 }
 
 class _AppLocalizationsDelegate

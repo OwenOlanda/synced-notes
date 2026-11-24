@@ -84,10 +84,10 @@ void main() {
     expect((await AppSettings.load()).themeMode, ThemeMode.system);
   });
 
-  test('las notas abren "donde me quedé" por defecto y se puede cambiar',
+  test('las notas abren "donde dejé de leer" por defecto y se puede cambiar',
       () async {
     final settings = await AppSettings.load();
-    expect(settings.noteOpenPosition, NoteOpenPosition.last);
+    expect(settings.noteOpenPosition, NoteOpenPosition.scroll);
     await settings.setNoteOpenPosition(NoteOpenPosition.end);
     expect((await AppSettings.load()).noteOpenPosition, NoteOpenPosition.end);
   });
@@ -148,5 +148,25 @@ void main() {
     expect(settings.lineNumbers, isFalse);
     await settings.setLineNumbers(true);
     expect((await AppSettings.load()).lineNumbers, isTrue);
+  });
+
+  test('vista previa: por defecto sigue a "Al abrir una nota"', () async {
+    final settings = await AppSettings.load();
+    expect(settings.listPreview, ListPreview.sameAsOpen);
+    expect(settings.effectiveListPreview, ListPreview.scroll);
+    await settings.setNoteOpenPosition(NoteOpenPosition.cursor);
+    expect(settings.effectiveListPreview, ListPreview.cursor);
+    await settings.setNoteOpenPosition(NoteOpenPosition.start);
+    expect(settings.effectiveListPreview, ListPreview.start);
+    await settings.setListPreview(ListPreview.cursor);
+    expect((await AppSettings.load()).effectiveListPreview,
+        ListPreview.cursor);
+  });
+
+  test('el "Donde me quedé" de antes cuenta como "donde dejé de leer"',
+      () async {
+    SharedPreferences.setMockInitialValues({'note_open_position': 'last'});
+    final settings = await AppSettings.load();
+    expect(settings.noteOpenPosition, NoteOpenPosition.scroll);
   });
 }
