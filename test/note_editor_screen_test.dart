@@ -616,4 +616,89 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
     });
   });
+
+  group('seleccionar más allá de lo que se ve', () {
+    final date = DateTime(2026, 11, 23, 18, 0);
+    final long = Note(
+      fileName: '2026-11-23_18-00-00 Larga.txt',
+      title: 'Larga',
+      content: List.generate(120, (i) => 'Renglón número $i').join('\n'),
+      createdAt: date,
+      modifiedAt: date,
+    );
+    final contentField = find.byType(TextField).last;
+
+    Future<void> showLong(WidgetTester tester) async {
+      await tester.pumpWidget(localizedApp(
+        NoteEditorScreen(note: long, storage: FakeStorage(), settings: settings),
+        locale: const Locale('es'),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    ScrollController scrollOf(WidgetTester tester) =>
+        tester.widget<TextField>(contentField).scrollController!;
+    TextEditingController contentOf(WidgetTester tester) =>
+        tester.widget<TextField>(contentField).controller!;
+
+    test('la velocidad depende de qué tan cerca está el dedo de la orilla', () {
+      const box = Rect.fromLTWH(0, 100, 400, 600); // de y=100 a y=700
+      double speed(double y) =>
+          NoteEditorScreenState.edgeScrollSpeed(y, box, 24);
+      expect(speed(400), 0); // en medio: nada
+      expect(speed(690), allOf(greaterThan(0), lessThan(700))); // abajo
+      expect(speed(110), allOf(lessThan(0), greaterThan(-700))); // arriba
+      expect(speed(695), greaterThan(speed(670))); // más cerca, más rápido
+      expect(speed(760), greaterThan(700)); // pasándose de la orilla
+      expect(speed(5000), 2400); // con tope
+      expect(speed(0), lessThan(-700)); // arriba, pasándose
+    });
+
+    testWidgets('con el dedo quieto en la orilla, la nota baja sola y la '
+        'selección lo sigue', (tester) async {
+      await showLong(tester);
+      final field = tester.getRect(contentField);
+      final finger = await tester.startGesture(
+          Offset(field.left + 40, field.top + 30));
+      await tester.pump(const Duration(milliseconds: 700)); // mantener
+      final start = contentOf(tester).selection;
+      expect(start.isCollapsed, isFalse);
+
+      // Hasta abajo, pasando un poco la orilla del texto, y quieto.
+      await finger.moveTo(Offset(field.left + 60, field.bottom - 4));
+      await tester.pump();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      final scrolled = scrollOf(tester).offset;
+      expect(scrolled, greaterThan(100));
+      expect(contentOf(tester).selection.end, greaterThan(start.end + 100));
+
+      // Al soltar, se detiene.
+      await finger.up();
+      await tester.pump();
+      final stopped = scrollOf(tester).offset;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(scrollOf(tester).offset, stopped);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('desplazar la nota con el dedo no activa nada en la orilla',
+        (tester) async {
+      await showLong(tester);
+      final field = tester.getRect(contentField);
+      final before = contentOf(tester).selection;
+      final finger = await tester.startGesture(field.center);
+      await finger.moveTo(Offset(field.center.dx, field.bottom - 4));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      // Ya estaba hasta arriba: arrastrar hacia abajo no la mueve, y la
+      // orilla no la hace bajar sola.
+      expect(scrollOf(tester).offset, 0);
+      expect(contentOf(tester).selection, before);
+      await finger.up();
+      await tester.pumpAndSettle();
+    });
+  });
 }

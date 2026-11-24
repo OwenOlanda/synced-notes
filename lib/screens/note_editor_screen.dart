@@ -98,7 +98,8 @@ class NoteEditorScreen extends StatefulWidget {
   State<NoteEditorScreen> createState() => NoteEditorScreenState();
 }
 
-class NoteEditorScreenState extends State<NoteEditorScreen> {
+class NoteEditorScreenState extends State<NoteEditorScreen>
+    with SingleTickerProviderStateMixin {
   // Orden de Tab dentro del editor.
   static const double _titleOrder = 1;
   static const double _contentOrder = 2;
@@ -178,7 +179,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
   // Desplazamiento: botón ir al inicio / al final y "donde me quedé" -------
 
   /// El desplazamiento del texto de la nota.
-  final ScrollController _contentScroll = ScrollController();
+  final _NoteScrollController _contentScroll = _NoteScrollController();
 
   /// El botón redondo ↑/↓ se ve mientras se desplaza y se esconde solo.
   final ValueNotifier<bool> _jumpVisible = ValueNotifier(false);
@@ -470,6 +471,168 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     if (_pinching && _touches.isEmpty) _endPinch();
   }
 
+  // Seleccionar más allá de lo que se ve ------------------------------------
+  //
+  // Al arrastrar un palito de selección (o al seleccionar manteniendo
+  // presionado) cerca de la orilla de arriba o de abajo del texto, la nota
+  // se desplaza sola y suave, aunque el dedo esté quieto, y la selección
+  // sigue al dedo. Como en las apps de Android.
+
+  /// El dedo que está seleccionando (uno solo) y dónde está.
+  int? _selPointer;
+  Offset _selDown = Offset.zero;
+  Offset _selFinger = Offset.zero;
+
+  /// La selección la última vez que cambió (para saber qué extremo se mueve).
+  TextSelection? _selLast;
+
+  /// Con este dedo ya cambió la selección: se está seleccionando (no
+  /// desplazando la nota con el dedo).
+  bool _selDragging = false;
+
+  /// Qué extremo de la selección sigue al dedo: `true` = el inicio
+  /// ([TextSelection.base]), `false` = el final ([TextSelection.extent]).
+  bool? _selMovesBase;
+  RenderEditable? _selEditable;
+
+  Ticker? _edgeTickerOrNull;
+  Ticker get _edgeTicker => _edgeTickerOrNull ??= createTicker(_onEdgeTick);
+  Duration _lastEdgeTick = Duration.zero;
+
+  /// Ve todos los dedos de la app (los palitos viven fuera del editor).
+  void _onGlobalPointer(PointerEvent event) {
+    if (event is PointerDownEvent) {
+      if (_selPointer != null) return; // un segundo dedo (pellizco)
+      if (event.kind != PointerDeviceKind.touch &&
+          event.kind != PointerDeviceKind.stylus) {
+        return;
+      }
+      _selPointer = event.pointer;
+      _selDown = event.position;
+      _selFinger = event.position;
+      _selLast = _content.selection;
+      _selDragging = false;
+      _selMovesBase = null;
+      return;
+    }
+    if (event.pointer != _selPointer) return;
+    if (event is PointerMoveEvent) {
+      _selFinger = event.position;
+    } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _endSelectionDrag();
+    }
+  }
+
+  /// La selección del texto cambió: si hay un dedo abajo, se está
+  /// seleccionando con él.
+  void _trackSelectionDrag() {
+    if (_selPointer == null || _pinching || !_contentFocus.hasFocus) return;
+    final selection = _content.selection;
+    final last = _selLast;
+    if (!selection.isValid || last == null || selection == last) return;
+    if (selection.baseOffset != last.baseOffset &&
+        selection.extentOffset == last.extentOffset) {
+      _selMovesBase = true;
+    } else if (selection.extentOffset != last.extentOffset) {
+      _selMovesBase = false;
+    }
+    _selLast = selection;
+    if (_selDragging) return;
+    _selDragging = true;
+    _selEditable = _contentEditable()?.renderEditable;
+    // Mientras tanto, Flutter ya no "brinca" la nota hacia el palito: el
+    // desplazamiento lo hace [_onEdgeTick], suave.
+    _contentScroll.holdJumps = true;
+    _lastEdgeTick = Duration.zero;
+    if (!_edgeTicker.isActive) _edgeTicker.start();
+  }
+
+  void _endSelectionDrag() {
+    _selPointer = null;
+    _selDragging = false;
+    _selMovesBase = null;
+    _selEditable = null;
+    _contentScroll.holdJumps = false;
+    if (_edgeTickerOrNull?.isActive ?? false) _edgeTickerOrNull!.stop();
+  }
+
+  /// Velocidad (píxeles por segundo; negativa = hacia arriba) según qué
+  /// tan cerca está el dedo de la orilla [box] del texto. Cerca de la orilla
+  /// va despacio (para afinar); pasándose de ella, cada vez más rápido.
+  static double edgeScrollSpeed(double y, Rect box, double lineHeight) {
+    final zone = math.min(math.max(lineHeight * 1.5, 36.0), box.height / 4);
+    if (y < box.top + zone) return -_speedAt(y - box.top, zone);
+    if (y > box.bottom - zone) return _speedAt(box.bottom - y, zone);
+    return 0;
+  }
+
+  static const double _slowSpeed = 40;
+  static const double _edgeSpeed = 700;
+  static const double _fastSpeed = 2400;
+
+  /// [inside]: cuánto le falta al dedo para llegar a la orilla (negativo =
+  /// ya se pasó).
+  static double _speedAt(double inside, double zone) {
+    if (inside >= 0) {
+      // Curva que empieza despacio y acelera hacia la orilla (t²): al
+      // entrar a la zona casi no se mueve; en la orilla llega a la misma
+      // velocidad de antes.
+      final t = 1 - math.min(inside / zone, 1.0);
+      return _slowSpeed + t * t * (_edgeSpeed - _slowSpeed);
+    }
+    return math.min(_edgeSpeed + -inside * 15, _fastSpeed);
+  }
+
+  void _onEdgeTick(Duration elapsed) {
+    final dt = ((elapsed - _lastEdgeTick).inMicroseconds / 1e6)
+        .clamp(0.0, 0.05)
+        .toDouble();
+    _lastEdgeTick = elapsed;
+    final editable = _selEditable;
+    if (!_selDragging || _pinching || dt == 0 || !_scrollReady) return;
+    if (editable == null || !editable.attached || !editable.hasSize) return;
+    // Al tocar (sin mover el dedo) no se desplaza nada, aunque sea cerca
+    // de la orilla: por ejemplo, al mantener presionada una palabra.
+    if ((_selFinger - _selDown).distance < kTouchSlop) return;
+    final box = editable.localToGlobal(Offset.zero) & editable.size;
+    final speed =
+        edgeScrollSpeed(_selFinger.dy, box, editable.preferredLineHeight);
+    if (speed == 0) return;
+    final position = _contentScroll.position;
+    final target = (position.pixels + speed * dt)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if (target == position.pixels) return;
+    _anchoring = true;
+    position.jumpTo(target);
+    _anchoring = false;
+    _followFinger(editable);
+  }
+
+  /// La selección llega hasta donde está el dedo (el extremo que se mueve).
+  void _followFinger(RenderEditable editable) {
+    final selection = _content.selection;
+    final movesBase = _selMovesBase;
+    if (!selection.isValid || movesBase == null) return;
+    final at = NoteSearch.safeCut(
+        _content.text, editable.getPositionForPoint(_selFinger).offset);
+    final TextSelection next;
+    if (selection.isCollapsed) {
+      next = TextSelection.collapsed(offset: at); // el palito del cursor
+    } else {
+      next = movesBase
+          ? TextSelection(baseOffset: at, extentOffset: selection.extentOffset)
+          : TextSelection(baseOffset: selection.baseOffset, extentOffset: at);
+      // Los palitos no se cruzan.
+      if (next.isCollapsed ||
+          (next.baseOffset < next.extentOffset) !=
+              (selection.baseOffset < selection.extentOffset)) {
+        return;
+      }
+    }
+    if (next != selection) _content.selection = next;
+  }
+
   Timer? _autosaveTimer;
   Future<void> _saveQueue = Future.value();
   bool _saving = false;
@@ -495,6 +658,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     _contentFocus.addListener(_onFieldFocusChanged);
     _titleUndo.addListener(_onUndoChanged);
     _contentUndo.addListener(_onUndoChanged);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_onGlobalPointer);
     _lifecycle = AppLifecycleListener(
       onPause: _saveIfAutosave, // Android: la app pasa a segundo plano
       onHide: _saveIfAutosave, // Windows: se minimiza la ventana
@@ -536,6 +700,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     _jumpVisible.dispose();
     _zoomPillTimer?.cancel();
     _zoomPillVisible.dispose();
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_onGlobalPointer);
+    _edgeTickerOrNull?.dispose();
     super.dispose();
   }
 
@@ -564,6 +730,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _onChanged() {
     if (!mounted) return;
+    _trackSelectionDrag();
     // Si se edita con la barra de búsqueda abierta, los resultados se
     // recalculan (se queda en el mismo número de resultado si aún existe).
     if (_findOpen) _updateMatches();
@@ -1662,4 +1829,17 @@ class _TwoFingerClaim extends OneSequenceGestureRecognizer {
 
   @override
   String get debugDescription => 'pellizco';
+}
+
+/// El desplazamiento del texto de la nota. Mientras se selecciona con el
+/// dedo ([holdJumps]), no deja que Flutter lo mueva de golpe hacia el palito:
+/// de eso se encarga el desplazamiento suave en las orillas.
+class _NoteScrollController extends ScrollController {
+  bool holdJumps = false;
+
+  @override
+  void jumpTo(double value) {
+    if (holdJumps) return;
+    super.jumpTo(value);
+  }
 }
