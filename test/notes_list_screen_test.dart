@@ -1512,4 +1512,104 @@ void main() {
       expect(storage.order, ['Recetas', 'Cartas']);
     });
   });
+
+  group('orden de las notas', () {
+    Note dated(String title, {required int created, required int edited,
+        String? group}) {
+      final c = DateTime(2026, 11, created, 12);
+      return Note(
+        fileName: NoteStorage.fileNameFor(title, c),
+        group: group,
+        title: title,
+        content: 'texto',
+        createdAt: c,
+        modifiedAt: DateTime(2026, 11, edited, 12),
+      );
+    }
+
+    final notes = [
+      dated('Banana', created: 5, edited: 20, group: 'Cartas'),
+      dated('Zanahoria', created: 1, edited: 10),
+      dated('Árbol', created: 15, edited: 15, group: 'Recetas'),
+    ];
+    const groups = [
+      NoteGroup(name: 'Recetas', color: GroupColor.orange),
+      NoteGroup(name: 'Cartas'),
+    ];
+    final orderButton = find.byKey(const ValueKey('note-order-button'));
+
+    Future<void> chooseOrder(WidgetTester tester, String label) async {
+      await tester.tap(orderButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.ancestor(
+          of: find.text(label).last,
+          matching: find.byType(CheckedPopupMenuItem<NoteOrder>)));
+      await tester.pumpAndSettle();
+    }
+
+    List<String> shown(WidgetTester tester) {
+      final rows = tester.widgetList<NoteRow>(find.byType(NoteRow)).toList();
+      return [for (final r in rows) r.note.title];
+    }
+
+    testWidgets('el botón dice el orden y el menú lo cambia en cualquier '
+        'momento', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      expect(find.descendant(of: orderButton, matching: find.text('Editadas')),
+          findsOneWidget);
+      expect(shown(tester), ['Banana', 'Árbol', 'Zanahoria']);
+
+      await chooseOrder(tester, 'Título (A–Z)');
+      expect(settings.noteOrder, NoteOrder.titleAz);
+      expect(shown(tester), ['Árbol', 'Banana', 'Zanahoria']);
+
+      await chooseOrder(tester, 'Creadas recientemente');
+      expect(shown(tester), ['Árbol', 'Banana', 'Zanahoria']);
+
+      await chooseOrder(tester, 'Título (Z–A)');
+      expect(shown(tester), ['Zanahoria', 'Banana', 'Árbol']);
+    });
+
+    testWidgets('"Abiertas recientemente" toma en cuenta lo que se abrió '
+        'antes de elegirlo', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      // Con el orden de siempre, se abre Zanahoria (la de hasta abajo).
+      await tester.tap(find.text('Zanahoria'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(shown(tester).last, 'Zanahoria');
+
+      await chooseOrder(tester, 'Abiertas recientemente');
+      expect(shown(tester).first, 'Zanahoria');
+    });
+
+    testWidgets('"Por grupo": secciones en Todas, en el orden de los grupos',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await chooseOrder(tester, 'Por grupo');
+      // Cartas, Recetas (el orden de los grupos) y Sin grupo al final.
+      expect(find.byKey(const ValueKey('group-section-Cartas')),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('group-section-Recetas')),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('group-section-')), findsOneWidget);
+      expect(shown(tester), ['Banana', 'Árbol', 'Zanahoria']);
+      // Diseño 39: cuántas notas tiene cada sección.
+      expect(find.descendant(
+              of: find.byKey(const ValueKey('group-section-Cartas')),
+              matching: find.text('Cartas')),
+          findsOneWidget);
+      expect(
+          tester
+              .widget<Text>(
+                  find.byKey(const ValueKey('group-section-count-Cartas')))
+              .data,
+          ' · 1');
+      // Dentro de un grupo no hay secciones.
+      await choose(tester, 'Recetas');
+      expect(find.byKey(const ValueKey('group-section-Recetas')),
+          findsNothing);
+    });
+  });
 }

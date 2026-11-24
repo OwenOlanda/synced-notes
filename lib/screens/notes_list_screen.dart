@@ -7,6 +7,7 @@ import '../models/group_filter.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
+import '../utils/note_order.dart';
 import '../utils/note_search.dart';
 import '../widgets/app_message.dart';
 import '../widgets/group_colors.dart';
@@ -61,6 +62,16 @@ class NotesListScreen extends StatefulWidget {
 
 /// Encabezados de la lista cuando hay notas fijadas.
 enum _Section { pinned, others }
+
+/// Encabezado de un grupo en el orden "Por grupo" (`group` null = Sin
+/// grupo).
+class _GroupSection {
+  const _GroupSection(this.group, this.count);
+  final String? group;
+
+  /// Cuántas notas hay en la sección.
+  final int count;
+}
 
 class _NotesListScreenState extends State<NotesListScreen> {
   List<Note>? _notes; // null = cargando
@@ -189,7 +200,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
   List<Note> _visibleNotes() {
     final all = _notes ?? const <Note>[];
     final search = _search;
-    final scoped = all.where(_scope.matches);
+    final scoped = sortNotes(
+      all.where(_scope.matches),
+      _effectiveOrder,
+      opened: _effectiveOrder == NoteOrder.opened
+          ? widget.settings.noteOpenedTimes()
+          : const {},
+      groupOrder: [for (final g in _groups) g.name],
+    );
     // Sin buscar: las fijadas de esta vista, arriba. Buscando, los pins no
     // cuentan (primero las que coinciden en el título).
     if (search.isEmpty) {
@@ -203,6 +221,80 @@ class _NotesListScreenState extends State<NotesListScreen> {
       ...found.where(search.matchesTitle),
       ...found.where((n) => !search.matchesTitle(n)),
     ];
+  }
+
+  /// El orden que se usa aquí: "Por grupo" solo tiene sentido en "Todas"
+  /// y sin buscar; en lo demás se ordena por editadas recientemente.
+  NoteOrder get _effectiveOrder {
+    final order = widget.settings.noteOrder;
+    if (order == NoteOrder.byGroup && (!_scope.isAll || !_search.isEmpty)) {
+      return NoteOrder.edited;
+    }
+    return order;
+  }
+
+  String _orderLabel(NoteOrder order, AppLocalizations l10n) =>
+      switch (order) {
+        NoteOrder.edited => l10n.orderEdited,
+        NoteOrder.opened => l10n.orderOpened,
+        NoteOrder.created => l10n.orderCreated,
+        NoteOrder.byGroup => l10n.orderByGroup,
+        NoteOrder.titleAz => l10n.orderTitleAz,
+        NoteOrder.titleZa => l10n.orderTitleZa,
+      };
+
+  String _orderShortLabel(NoteOrder order, AppLocalizations l10n) =>
+      switch (order) {
+        NoteOrder.edited => l10n.orderEditedShort,
+        NoteOrder.opened => l10n.orderOpenedShort,
+        NoteOrder.created => l10n.orderCreatedShort,
+        NoteOrder.byGroup => l10n.orderByGroup,
+        NoteOrder.titleAz => l10n.orderTitleAzShort,
+        NoteOrder.titleZa => l10n.orderTitleZaShort,
+      };
+
+  /// "↕ Editadas": muestra el orden de la lista y, al tocarlo, un menú para
+  /// cambiarlo (el actual, marcado). Se puede cambiar en cualquier momento.
+  Widget _buildOrderButton(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final current = widget.settings.noteOrder;
+    return PopupMenuButton<NoteOrder>(
+      key: const ValueKey('note-order-button'),
+      tooltip: l10n.orderMenuTooltip,
+      initialValue: current,
+      onSelected: (order) async {
+        await widget.settings.setNoteOrder(order);
+        if (mounted) setState(() {});
+      },
+      itemBuilder: (context) => [
+        for (final order in NoteOrder.values)
+          CheckedPopupMenuItem<NoteOrder>(
+            value: order,
+            checked: order == current,
+            child: Text(_orderLabel(order, l10n)),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.swap_vert, size: 18, color: muted),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                _orderShortLabel(current, l10n),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Nombre de un lugar donde buscar (Todas / Sin grupo / un grupo).
@@ -565,6 +657,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// con "Buscar en esta nota" puesta en la coincidencia número [match]
   /// (0 = la primera).
   Future<void> _open(Note note, {int match = 0}) async {
+    // Se anota siempre (aunque el orden no sea "Abiertas recientemente"):
+    // así, al elegirlo, la lista ya refleja lo que se abrió antes.
+    if (note.isSaved) {
+      // Sin esperar a que se escriba: el orden ya lo ve de inmediato.
+      widget.settings.markNoteOpened(NoteStorage.noteId(note));
+    }
     final search = _search;
     final find = !search.isEmpty && search.matchesIn(note).isNotEmpty
         ? (query: _searchText.text.trim(), match: match)
@@ -967,19 +1065,23 @@ class _NotesListScreenState extends State<NotesListScreen> {
         bottom: !loaded
             ? null
             : PreferredSize(
-                preferredSize: const Size.fromHeight(26),
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 8),
-                    child: Text(
-                      l10n.listSummary(
-                          _viewLabel(l10n), l10n.notesCount(visible)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant),
-                    ),
+                preferredSize: const Size.fromHeight(32),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 10, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.listSummary(
+                              _viewLabel(l10n), l10n.notesCount(visible)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                      _buildOrderButton(context),
+                    ],
                   ),
                 ),
               ),
@@ -1249,6 +1351,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant),
                   ),
+                  // En su propio renglón: la columna de la lista puede ser
+                  // angosta (junto a "Nueva nota").
+                  Transform.translate(
+                    offset: const Offset(-6, 0),
+                    child: _buildOrderButton(context),
+                  ),
                 ],
               ),
             ),
@@ -1343,16 +1451,34 @@ class _NotesListScreenState extends State<NotesListScreen> {
       );
     }
 
-    // El grupo de cada nota se muestra cuando la lista mezcla grupos.
-    final showGroup = _scope.isAll;
+    // "Por grupo" (en Todas, sin buscar): una sección por grupo.
+    final bySections =
+        search.isEmpty && _effectiveOrder == NoteOrder.byGroup;
+    // El grupo de cada nota se muestra cuando la lista mezcla grupos (en
+    // secciones ya lo dice su encabezado).
+    final showGroup = _scope.isAll && !bySections;
     // Con notas fijadas (y sin buscar): "Fijadas" arriba y "Otras" abajo.
     final pinnedCount =
         search.isEmpty ? notes.takeWhile(_isPinned).length : 0;
     final items = <Object>[
       if (pinnedCount > 0) _Section.pinned,
       ...notes.take(pinnedCount),
-      if (pinnedCount > 0 && pinnedCount < notes.length) _Section.others,
-      ...notes.skip(pinnedCount),
+      if (bySections) ...[
+        for (final (i, note) in notes.skip(pinnedCount).indexed) ...[
+          if (i == 0 || notes[pinnedCount + i - 1].group != note.group)
+            _GroupSection(
+              note.group,
+              notes
+                  .skip(pinnedCount)
+                  .where((n) => n.group == note.group)
+                  .length,
+            ),
+          note,
+        ],
+      ] else ...[
+        if (pinnedCount > 0 && pinnedCount < notes.length) _Section.others,
+        ...notes.skip(pinnedCount),
+      ],
     ];
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(8, 4, 8, bottomSpace),
@@ -1369,6 +1495,52 @@ class _NotesListScreenState extends State<NotesListScreen> {
               key: ValueKey(pinnedHeader ? 'pinned-header' : 'others-header'),
               style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant),
+            ),
+          );
+        }
+        if (item is _GroupSection) {
+          // Carpetita + nombre (como antes) · cuántas notas ───── (línea
+          // del color del grupo que se desvanece hacia la derecha, diseño 39).
+          final name = item.group;
+          final muted = theme.colorScheme.onSurfaceVariant;
+          final color = name == null ? muted : _colorOf(name, theme);
+          final label =
+              theme.textTheme.labelLarge?.copyWith(color: muted);
+          return Padding(
+            key: ValueKey('group-section-${name ?? ''}'),
+            padding: const EdgeInsetsDirectional.fromSTEB(22, 16, 12, 4),
+            child: Row(
+              children: [
+                if (name != null) ...[
+                  GroupFolderIcon(color, size: 16),
+                  const SizedBox(width: 8),
+                ],
+                Flexible(
+                  child: Text(
+                    name ?? l10n.groupsNone,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: label,
+                  ),
+                ),
+                Text(
+                  ' · ${item.count}',
+                  key: ValueKey('group-section-count-${name ?? ''}'),
+                  style: label,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    height: 1.5,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(1),
+                      gradient: LinearGradient(
+                        colors: [color, color.withValues(alpha: 0)],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         }

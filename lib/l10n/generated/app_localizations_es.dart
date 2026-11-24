@@ -562,4 +562,54 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get reorderGroupHint => 'Arrastra para cambiar el orden';
+
+  @override
+  String get orderMenuTooltip => 'Ordenar notas';
+
+  @override
+  String get orderEdited => 'Editadas recientemente';
+
+  @override
+  String get orderEditedShort => 'Editadas';
+
+  @override
+  String get orderOpened => 'Abiertas recientemente';
+
+  @override
+  String get orderOpenedShort => 'Abiertas';
+
+  @override
+  String get orderCreated => 'Creadas recientemente';
+
+  @override
+  String get orderCreatedShort => 'Creadas';
+
+  @override
+  String get orderByGroup => 'Por grupo';
+
+  @override
+  String get orderTitleAz => 'Título (A–Z)';
+
+  @override
+  String get orderTitleAzShort => 'A–Z';
+
+  @override
+  String get orderTitleZa => 'Título (Z–A)';
+
+  @override
+  String get orderTitleZaShort => 'Z–A';
+
+  @override
+  String openLink(String target) {
+    return 'Abrir $target';
+  }
+
+  @override
+  String get openLinkCtrlHint => 'Ctrl + clic';
+
+  @override
+  String get openLinkMenu => 'Abrir enlace';
+
+  @override
+  String get openLinkError => 'No se pudo abrir el enlace';
 }

@@ -125,4 +125,21 @@ void main() {
     await settings.setTextZoom(0.1);
     expect(settings.textZoom, AppSettings.minTextZoom);
   });
+
+  test('orden de la lista: editadas por defecto y se recuerda', () async {
+    final settings = await AppSettings.load();
+    expect(settings.noteOrder, NoteOrder.edited);
+    await settings.setNoteOrder(NoteOrder.titleAz);
+    expect((await AppSettings.load()).noteOrder, NoteOrder.titleAz);
+  });
+
+  test('anota cuándo se abrió cada nota (las más recientes)', () async {
+    final settings = await AppSettings.load();
+    await settings.markNoteOpened('a', DateTime(2026, 11, 23, 10));
+    await settings.markNoteOpened('b', DateTime(2026, 11, 23, 11));
+    expect(settings.noteOpenedTimes(), {
+      'a': DateTime(2026, 11, 23, 10).millisecondsSinceEpoch,
+      'b': DateTime(2026, 11, 23, 11).millisecondsSinceEpoch,
+    });
+  });
 }

@@ -15,7 +15,8 @@ import '../utils/note_search.dart';
 /// - las opciones de búsqueda (Aa, á, ab);
 /// - si el teclado empieza las oraciones con mayúscula;
 /// - dónde se abre una nota y dónde se quedó cada una (en este dispositivo);
-/// - el tamaño del texto de las notas (zoom, en este dispositivo).
+/// - el tamaño del texto de las notas (zoom, en este dispositivo);
+/// - el orden de la lista y cuándo se abrió cada nota (en este dispositivo).
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._prefs);
 
@@ -32,6 +33,8 @@ class AppSettings extends ChangeNotifier {
   static const String _searchAccentsKey = 'search_match_accents';
   static const String _searchWholeWordKey = 'search_whole_word';
   static const String _textZoomKey = 'text_zoom';
+  static const String _noteOrderKey = 'note_order';
+  static const String _openedKey = 'note_opened';
 
   static Future<AppSettings> load() async =>
       AppSettings._(await SharedPreferences.getInstance());
@@ -147,6 +150,51 @@ class AppSettings extends ChangeNotifier {
   static double snapTextZoom(double zoom) =>
       (clampTextZoom(zoom) * 10).round() / 10;
 
+  /// Orden de la lista de notas (el mismo en todas las vistas). Por
+  /// defecto: editadas recientemente.
+  NoteOrder get noteOrder {
+    final saved = _prefs.getString(_noteOrderKey);
+    return NoteOrder.values.firstWhere((o) => o.name == saved,
+        orElse: () => NoteOrder.edited);
+  }
+
+  Future<void> setNoteOrder(NoteOrder order) async {
+    await _prefs.setString(_noteOrderKey, order.name);
+    notifyListeners();
+  }
+
+  /// Cuántas notas recuerdan cuándo se abrieron (las más recientes).
+  static const int maxRememberedOpens = 1000;
+
+  /// Cuándo se abrió cada nota en este dispositivo: id → milisegundos.
+  /// Se anota siempre, sin importar el orden elegido: así "Abiertas
+  /// recientemente" funciona en cuanto se elige.
+  Map<String, int> noteOpenedTimes() {
+    final raw = _prefs.getString(_openedKey);
+    if (raw == null) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      return {
+        for (final e in decoded.entries)
+          if (e.value is int) '${e.key}': e.value as int,
+      };
+    } on FormatException {
+      return {};
+    }
+  }
+
+  /// Anota que se abrió una nota (ahora, o en [at]).
+  Future<void> markNoteOpened(String noteId, [DateTime? at]) async {
+    final times = noteOpenedTimes()
+      ..remove(noteId) // al final = la más reciente
+      ..[noteId] = (at ?? DateTime.now()).millisecondsSinceEpoch;
+    while (times.length > maxRememberedOpens) {
+      times.remove(times.keys.first);
+    }
+    await _prefs.setString(_openedKey, jsonEncode(times));
+  }
+
   /// Cuántas notas recuerdan su posición (las más recientes).
   static const int maxRememberedPositions = 300;
 
@@ -185,6 +233,28 @@ class AppSettings extends ChangeNotifier {
 
 /// Dónde se abre una nota.
 enum NoteOpenPosition { start, end, last }
+
+/// Orden de la lista de notas.
+enum NoteOrder {
+  /// Editadas recientemente (la última que cambió, arriba).
+  edited,
+
+  /// Abiertas recientemente (abrir una nota la sube).
+  opened,
+
+  /// Creadas recientemente.
+  created,
+
+  /// Por grupo: en "Todas", una sección por grupo (en el orden de los
+  /// grupos) y "Sin grupo" al final; dentro, editadas recientemente.
+  byGroup,
+
+  /// Por título, de la A a la Z (las que no tienen título, al final).
+  titleAz,
+
+  /// Por título, de la Z a la A (las que no tienen título, al final).
+  titleZa,
+}
 
 /// Dónde se quedó una nota, en letras (no en píxeles): [cursor] es dónde
 /// estaba el cursor y [topChar], la letra que se veía hasta arriba. Así

@@ -701,4 +701,114 @@ void main() {
       await tester.pumpAndSettle();
     });
   });
+
+  group('enlaces', () {
+    final date = DateTime(2026, 11, 23, 21, 0);
+    final note = Note(
+      fileName: '2026-11-23_21-00-00 Enlaces.txt',
+      title: 'Enlaces',
+      content: 'Visita https://example.com hoy\nCorreo: a@b.mx',
+      createdAt: date,
+      modifiedAt: date,
+    );
+    final contentField = find.byType(TextField).last;
+    final chip = find.byKey(const ValueKey('link-chip'));
+    late List<Uri> opened;
+
+    setUp(() {
+      opened = [];
+      NoteEditorScreen.openUri = (uri) async {
+        opened.add(uri);
+        return true;
+      };
+    });
+
+    Future<FindHighlightController> showLinks(WidgetTester tester) async {
+      await tester.pumpWidget(localizedApp(
+        NoteEditorScreen(note: note, storage: FakeStorage(), settings: settings),
+        locale: const Locale('es'),
+      ));
+      await tester.pumpAndSettle();
+      return tester.widget<TextField>(contentField).controller!
+          as FindHighlightController;
+    }
+
+    testWidgets('los enlaces se ven subrayados', (tester) async {
+      final controller = await showLinks(tester);
+      final span = controller.buildTextSpan(
+          context: tester.element(contentField), withComposing: false);
+      final underlined = <String>[];
+      span.visitChildren((child) {
+        final s = child as TextSpan;
+        if (s.style?.decoration == TextDecoration.underline) {
+          underlined.add(s.text!);
+        }
+        return true;
+      });
+      expect(underlined, ['https://example.com', 'a@b.mx']);
+    });
+
+    testWidgets('el cursor sobre un enlace muestra "Abrir …"; tocarla lo abre',
+        (tester) async {
+      final controller = await showLinks(tester);
+      await tester.tap(contentField);
+      await tester.pump();
+      controller.selection = const TextSelection.collapsed(offset: 12);
+      await tester.pump();
+      expect(chip, findsOneWidget);
+      expect(find.text('Abrir example.com'), findsOneWidget);
+
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      expect(opened, [Uri.parse('https://example.com')]);
+      expect(chip, findsNothing);
+    });
+
+    testWidgets('al escribir, la pastillita desaparece', (tester) async {
+      final controller = await showLinks(tester);
+      await tester.tap(contentField);
+      await tester.pump();
+      controller.selection = TextSelection.collapsed(
+          offset: controller.text.length - 2); // en el correo
+      await tester.pump();
+      expect(find.text('Abrir a@b.mx'), findsOneWidget);
+      await tester.enterText(contentField, '${controller.text} más');
+      await tester.pump();
+      expect(chip, findsNothing);
+      // Fuera de un enlace no hay pastillita.
+      controller.selection = const TextSelection.collapsed(offset: 2);
+      await tester.pump();
+      expect(chip, findsNothing);
+    });
+
+    testWidgets('PC: Ctrl + clic sobre el enlace lo abre', (tester) async {
+      await showLinks(tester);
+      final editable = tester
+          .state<EditableTextState>(find.descendant(
+              of: contentField, matching: find.byType(EditableText)))
+          .renderEditable;
+      final box = editable
+          .getBoxesForSelection(
+              const TextSelection(baseOffset: 9, extentOffset: 18))
+          .first
+          .toRect();
+      final point = editable.localToGlobal(box.center);
+
+      // Sin Ctrl, el clic solo pone el cursor.
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: point);
+      addTearDown(mouse.removePointer);
+      await mouse.down(point);
+      await mouse.up();
+      await tester.pumpAndSettle();
+      expect(opened, isEmpty);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await mouse.down(point);
+      await mouse.up();
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(opened, [Uri.parse('https://example.com')]);
+    });
+  });
 }

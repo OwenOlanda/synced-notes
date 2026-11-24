@@ -561,4 +561,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reorderGroupHint => 'Drag to reorder';
+
+  @override
+  String get orderMenuTooltip => 'Sort notes';
+
+  @override
+  String get orderEdited => 'Recently edited';
+
+  @override
+  String get orderEditedShort => 'Edited';
+
+  @override
+  String get orderOpened => 'Recently opened';
+
+  @override
+  String get orderOpenedShort => 'Opened';
+
+  @override
+  String get orderCreated => 'Recently created';
+
+  @override
+  String get orderCreatedShort => 'Created';
+
+  @override
+  String get orderByGroup => 'By group';
+
+  @override
+  String get orderTitleAz => 'Title (A–Z)';
+
+  @override
+  String get orderTitleAzShort => 'A–Z';
+
+  @override
+  String get orderTitleZa => 'Title (Z–A)';
+
+  @override
+  String get orderTitleZaShort => 'Z–A';
+
+  @override
+  String openLink(String target) {
+    return 'Open $target';
+  }
+
+  @override
+  String get openLinkCtrlHint => 'Ctrl + click';
+
+  @override
+  String get openLinkMenu => 'Open link';
+
+  @override
+  String get openLinkError => 'Couldn\'t open the link';
 }

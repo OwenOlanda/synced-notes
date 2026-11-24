@@ -1027,6 +1027,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drag to reorder'**
   String get reorderGroupHint;
+
+  /// Tooltip of the small button above the list that shows and changes the order of the notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort notes'**
+  String get orderMenuTooltip;
+
+  /// Note order: the most recently edited first (default).
+  ///
+  /// In en, this message translates to:
+  /// **'Recently edited'**
+  String get orderEdited;
+
+  /// Short label of the 'Recently edited' order, shown on the sort button.
+  ///
+  /// In en, this message translates to:
+  /// **'Edited'**
+  String get orderEditedShort;
+
+  /// Note order: the most recently opened first (on this device).
+  ///
+  /// In en, this message translates to:
+  /// **'Recently opened'**
+  String get orderOpened;
+
+  /// Short label of the 'Recently opened' order, shown on the sort button.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened'**
+  String get orderOpenedShort;
+
+  /// Note order: the newest notes first.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently created'**
+  String get orderCreated;
+
+  /// Short label of the 'Recently created' order, shown on the sort button.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get orderCreatedShort;
+
+  /// Note order: in All, one section per group (in the groups' order), No group last.
+  ///
+  /// In en, this message translates to:
+  /// **'By group'**
+  String get orderByGroup;
+
+  /// Note order: by title, A to Z (untitled notes last).
+  ///
+  /// In en, this message translates to:
+  /// **'Title (A–Z)'**
+  String get orderTitleAz;
+
+  /// Short label of the 'Title (A–Z)' order, shown on the sort button.
+  ///
+  /// In en, this message translates to:
+  /// **'A–Z'**
+  String get orderTitleAzShort;
+
+  /// Note order: by title, Z to A (untitled notes last).
+  ///
+  /// In en, this message translates to:
+  /// **'Title (Z–A)'**
+  String get orderTitleZa;
+
+  /// Short label of the 'Title (Z–A)' order, shown on the sort button.
+  ///
+  /// In en, this message translates to:
+  /// **'Z–A'**
+  String get orderTitleZaShort;
+
+  /// Little floating button over a link in a note: opens it (a website, an email address or a phone number).
+  ///
+  /// In en, this message translates to:
+  /// **'Open {target}'**
+  String openLink(String target);
+
+  /// PC: reminder that Ctrl + click on a link opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl + click'**
+  String get openLinkCtrlHint;
+
+  /// Copy/paste menu option when the selection is a link.
+  ///
+  /// In en, this message translates to:
+  /// **'Open link'**
+  String get openLinkMenu;
+
+  /// Message when a link (website, email or phone) couldn't be opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the link'**
+  String get openLinkError;
 }
 
 class _AppLocalizationsDelegate

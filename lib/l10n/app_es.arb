@@ -154,5 +154,21 @@
   "unpinNote": "Desfijar",
   "pinnedNotes": "Fijadas",
   "otherNotes": "Otras",
-  "reorderGroupHint": "Arrastra para cambiar el orden"
+  "reorderGroupHint": "Arrastra para cambiar el orden",
+  "orderMenuTooltip": "Ordenar notas",
+  "orderEdited": "Editadas recientemente",
+  "orderEditedShort": "Editadas",
+  "orderOpened": "Abiertas recientemente",
+  "orderOpenedShort": "Abiertas",
+  "orderCreated": "Creadas recientemente",
+  "orderCreatedShort": "Creadas",
+  "orderByGroup": "Por grupo",
+  "orderTitleAz": "Título (A–Z)",
+  "orderTitleAzShort": "A–Z",
+  "orderTitleZa": "Título (Z–A)",
+  "orderTitleZaShort": "Z–A",
+  "openLink": "Abrir {target}",
+  "openLinkCtrlHint": "Ctrl + clic",
+  "openLinkMenu": "Abrir enlace",
+  "openLinkError": "No se pudo abrir el enlace"
 }

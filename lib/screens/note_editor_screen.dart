@@ -2,17 +2,20 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show AppExitResponse;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart' show Simulation;
 import 'package:flutter/rendering.dart' show RenderEditable;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/l10n.dart';
 import '../models/note.dart';
 import '../services/app_settings.dart';
 import '../services/note_storage.dart';
+import '../utils/note_links.dart';
 import '../utils/note_search.dart';
 import '../widgets/app_message.dart';
 import '../widgets/blocked_chars_formatter.dart';
@@ -94,6 +97,12 @@ class NoteEditorScreen extends StatefulWidget {
   /// [initialFind]: quien abrió la nota puede cerrar también su búsqueda.
   final VoidCallback? onFindDismissed;
 
+  /// Abre un enlace (página, correo o teléfono) fuera de la app. Las
+  /// pruebas lo cambian para no abrir nada de verdad.
+  @visibleForTesting
+  static Future<bool> Function(Uri uri) openUri =
+      (uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
+
   @override
   State<NoteEditorScreen> createState() => NoteEditorScreenState();
 }
@@ -167,6 +176,13 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
   void _redo() => _activeUndo.redo();
 
   void _onFieldFocusChanged() {
+    // Al tocar un enlace con el campo sin foco, el cursor puede llegar antes
+    // que el foco: se revisa otra vez.
+    if (_contentFocus.hasFocus) {
+      _updateLinkChip();
+    } else {
+      _chipLink = null;
+    }
     if (_titleFocus.hasFocus) _lastFieldIsTitle = true;
     if (_contentFocus.hasFocus) _lastFieldIsTitle = false;
     if (mounted) setState(() {}); // mostrar u ocultar la barrita del teclado
@@ -633,6 +649,236 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
     if (next != selection) _content.selection = next;
   }
 
+  // Enlaces (páginas, correos, teléfonos) --------------------------------------
+
+  /// El enlace donde quedó el cursor al tocarlo: arriba de él aparece la
+  /// pastillita "🔗 Abrir …". `null` = no se muestra.
+  NoteLink? _chipLink;
+
+  /// El texto la última vez que cambió algo (para saber si se escribió o
+  /// solo se movió el cursor).
+  String? _lastContentText;
+
+  /// Tras Ctrl + clic en un enlace no se muestra la pastillita (ya se abrió).
+  bool _skipNextChip = false;
+
+  /// Para encontrar dónde poner la pastillita (en coordenadas de los campos).
+  final GlobalKey _fieldsStackKey = GlobalKey();
+
+  /// PC: el mouse está sobre un enlace con Ctrl presionado (manita).
+  bool _ctrlOverLink = false;
+  Offset? _lastHover;
+
+  static bool get _isDesktop => switch (defaultTargetPlatform) {
+        TargetPlatform.windows ||
+        TargetPlatform.linux ||
+        TargetPlatform.macOS =>
+          true,
+        _ => false,
+      };
+
+  /// Se muestra la pastillita si el cursor quedó sobre un enlace sin que se
+  /// haya escrito (un toque); al escribir, desaparece.
+  void _updateLinkChip() {
+    final text = _content.text;
+    final typed = text != _lastContentText;
+    _lastContentText = text;
+    NoteLink? link;
+    final selection = _content.selection;
+    if (!typed &&
+        _contentFocus.hasFocus &&
+        selection.isValid &&
+        selection.isCollapsed) {
+      link = linkAt(_content.links, selection.baseOffset);
+    }
+    if (_skipNextChip) {
+      _skipNextChip = false;
+      link = null;
+    }
+    _chipLink = link;
+  }
+
+  /// El enlace que abarca la selección (para "Abrir enlace" en el menú de
+  /// copiar y pegar).
+  NoteLink? _linkForSelection(TextSelection selection) {
+    if (!selection.isValid) return null;
+    for (final l in _content.links) {
+      if (selection.start >= l.start && selection.end <= l.end) return l;
+    }
+    return null;
+  }
+
+  Future<void> _openLink(NoteLink link) async {
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _chipLink = null);
+    var opened = false;
+    try {
+      opened = await NoteEditorScreen.openUri(link.uri);
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened) messenger.showMessage(l10n.openLinkError, isError: true);
+  }
+
+  /// El enlace bajo un punto de la pantalla (sobre su texto, no solo en su
+  /// renglón).
+  NoteLink? _linkAtGlobal(Offset global) {
+    final editable = _contentEditable()?.renderEditable;
+    if (editable == null || !editable.attached || !editable.hasSize) {
+      return null;
+    }
+    final offset = editable.getPositionForPoint(global).offset;
+    final link = linkAt(_content.links, offset);
+    if (link == null) return null;
+    final local = editable.globalToLocal(global);
+    final boxes = editable.getBoxesForSelection(
+        TextSelection(baseOffset: link.start, extentOffset: link.end));
+    return boxes.any((b) => b.toRect().inflate(2).contains(local))
+        ? link
+        : null;
+  }
+
+  /// PC: Ctrl + clic abre el enlace.
+  void _onContentPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.mouse ||
+        event.buttons != kPrimaryButton ||
+        !HardwareKeyboard.instance.isControlPressed) {
+      return;
+    }
+    final link = _linkAtGlobal(event.position);
+    if (link == null) return;
+    _skipNextChip = true;
+    _openLink(link);
+  }
+
+  void _onContentHover(PointerHoverEvent event) {
+    _lastHover = event.position;
+    _refreshLinkCursor();
+  }
+
+  void _onContentExit(PointerExitEvent event) {
+    _lastHover = null;
+    _refreshLinkCursor();
+  }
+
+  /// Presionar o soltar Ctrl sin mover el mouse también cambia la manita.
+  bool _onKeyForLinkCursor(KeyEvent event) {
+    if (_lastHover != null) _refreshLinkCursor();
+    return false;
+  }
+
+  void _refreshLinkCursor() {
+    final hover = _lastHover;
+    final over = hover != null &&
+        HardwareKeyboard.instance.isControlPressed &&
+        _linkAtGlobal(hover) != null;
+    if (over != _ctrlOverLink && mounted) setState(() => _ctrlOverLink = over);
+  }
+
+  /// La pastillita "🔗 Abrir ejemplo.com" justo arriba del enlace (o abajo,
+  /// si no cabe). Sigue al enlace al desplazar la nota.
+  Widget _buildLinkChip(BuildContext context) {
+    // Siempre "Positioned": un hijo normal (sin posición) de tamaño cero
+    // encogía el Stack de los campos y ya no se podían tocar.
+    const nothing = Positioned(left: 0, top: 0, child: SizedBox.shrink());
+    final link = _chipLink;
+    if (link == null) return nothing;
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return ListenableBuilder(
+      listenable: _contentScroll,
+      builder: (context, _) {
+        // Durante la construcción no se puede buscar el campo entre los
+        // widgets: se usa el que ya se encontró antes.
+        final state = _editableState;
+        final editable =
+            state != null && state.mounted ? state.renderEditable : null;
+        final stack =
+            _fieldsStackKey.currentContext?.findRenderObject() as RenderBox?;
+        if (editable == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || _contentEditable() == null) return;
+            setState(() {});
+          });
+          return nothing;
+        }
+        if (!editable.attached ||
+            !editable.hasSize ||
+            stack == null ||
+            !stack.hasSize) {
+          return nothing;
+        }
+        final caret =
+            editable.getLocalRectForCaret(TextPosition(offset: link.start));
+        // El enlace salió de la vista: sin pastillita.
+        if (caret.bottom < 0 || caret.top > editable.size.height) {
+          return nothing;
+        }
+        final anchor =
+            stack.globalToLocal(editable.localToGlobal(caret.topLeft));
+        const chipHeight = 36.0;
+        final above = anchor.dy - chipHeight - 6;
+        final top = above >= 0
+            ? above
+            : anchor.dy + editable.preferredLineHeight + 6;
+        final maxWidth = math.max(120.0, stack.size.width - 16);
+        final left = anchor.dx
+            .clamp(8.0, math.max(8.0, stack.size.width - 220))
+            .toDouble();
+        final icon = switch (link.kind) {
+          NoteLinkKind.web => Icons.link,
+          NoteLinkKind.email => Icons.mail_outline,
+          NoteLinkKind.phone => Icons.phone_outlined,
+        };
+        final label = _isDesktop
+            ? '${l10n.openLink(link.display)} (${l10n.openLinkCtrlHint})'
+            : l10n.openLink(link.display);
+        return Positioned(
+          left: left,
+          top: top,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Material(
+              key: const ValueKey('link-chip'),
+              color: scheme.inverseSurface,
+              shape: const StadiumBorder(),
+              elevation: 3,
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: () => _openLink(link),
+                child: SizedBox(
+                  height: chipHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: 16, color: scheme.onInverseSurface),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: scheme.onInverseSurface,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Timer? _autosaveTimer;
   Future<void> _saveQueue = Future.value();
   bool _saving = false;
@@ -651,7 +897,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
     _title = FindHighlightController(text: _note.title)
       ..selection = TextSelection.collapsed(offset: _note.title.length)
       ..addListener(_onChanged);
-    _content = FindHighlightController(text: _note.content)
+    _content = FindHighlightController(text: _note.content, detectLinks: true)
       ..selection = TextSelection.collapsed(offset: _note.content.length)
       ..addListener(_onChanged);
     _titleFocus.addListener(_onFieldFocusChanged);
@@ -659,6 +905,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
     _titleUndo.addListener(_onUndoChanged);
     _contentUndo.addListener(_onUndoChanged);
     GestureBinding.instance.pointerRouter.addGlobalRoute(_onGlobalPointer);
+    HardwareKeyboard.instance.addHandler(_onKeyForLinkCursor);
+    _lastContentText = _note.content;
     _lifecycle = AppLifecycleListener(
       onPause: _saveIfAutosave, // Android: la app pasa a segundo plano
       onHide: _saveIfAutosave, // Windows: se minimiza la ventana
@@ -701,6 +949,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
     _zoomPillTimer?.cancel();
     _zoomPillVisible.dispose();
     GestureBinding.instance.pointerRouter.removeGlobalRoute(_onGlobalPointer);
+    HardwareKeyboard.instance.removeHandler(_onKeyForLinkCursor);
     _edgeTickerOrNull?.dispose();
     super.dispose();
   }
@@ -731,6 +980,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
   void _onChanged() {
     if (!mounted) return;
     _trackSelectionDrag();
+    _updateLinkChip();
     // Si se edita con la barra de búsqueda abierta, los resultados se
     // recalculan (se queda en el mismo número de resultado si aún existe).
     if (_findOpen) _updateMatches();
@@ -896,7 +1146,12 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
   }
 
   /// El EditableText del campo del texto (lo que se desplaza).
+  /// El campo del texto, ya encontrado (ver [_contentEditable]).
+  EditableTextState? _editableState;
+
   EditableTextState? _contentEditable() {
+    final cached = _editableState;
+    if (cached != null && cached.mounted) return cached;
     EditableTextState? found;
     void visit(Element element) {
       if (found != null) return;
@@ -908,7 +1163,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
     }
 
     _contentKey.currentContext?.visitChildElements(visit);
-    return found;
+    return _editableState = found;
   }
 
   // ---------------------------------------------------------------------------
@@ -1289,8 +1544,38 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
               interactive: true,
               thickness: 5,
               radius: const Radius.circular(3),
-              child: TextField(
+              // PC: Ctrl + clic abre un enlace (con manita al pasar encima).
+              child: Listener(
+                onPointerDown: _onContentPointerDown,
+                onPointerHover: _onContentHover,
+                child: MouseRegion(
+                  onExit: _onContentExit,
+                  child: TextField(
             key: _contentKey,
+            mouseCursor: _ctrlOverLink ? SystemMouseCursors.click : null,
+            // "Abrir enlace" en el menú de copiar y pegar, si lo
+            // seleccionado es un enlace.
+            contextMenuBuilder: (context, editable) {
+              final items = [...editable.contextMenuButtonItems];
+              final link =
+                  _linkForSelection(editable.textEditingValue.selection);
+              if (link != null) {
+                items.insert(
+                  0,
+                  ContextMenuButtonItem(
+                    label: l10n.openLinkMenu,
+                    onPressed: () {
+                      editable.hideToolbar();
+                      _openLink(link);
+                    },
+                  ),
+                );
+              }
+              return AdaptiveTextSelectionToolbar.buttonItems(
+                anchors: editable.contextMenuAnchors,
+                buttonItems: items,
+              );
+            },
             controller: _content,
             focusNode: _contentFocus,
             undoController: _contentUndo,
@@ -1312,6 +1597,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
               contentPadding: fieldPadding,
             ),
           ),
+                ),
+              ),
             ),
             ),
           ),
@@ -1335,6 +1622,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
         return false;
       },
       child: Stack(
+        key: _fieldsStackKey,
         children: [
           Positioned.fill(
             // Zoom: dos dedos (pellizco), touchpad y Ctrl + rueda. El
@@ -1361,6 +1649,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
               ),
             ),
           ),
+          // "🔗 Abrir …" sobre el enlace donde quedó el cursor.
+          _buildLinkChip(context),
           // Píldora con el tamaño ("120%") mientras se hace zoom.
           Positioned(
             top: 8,
