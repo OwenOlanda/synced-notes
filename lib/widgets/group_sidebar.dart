@@ -33,6 +33,7 @@ class GroupSidebar extends StatelessWidget {
     required this.onCreate,
     required this.onGroupAction,
     required this.onOpenSettings,
+    this.onReorder,
   });
 
   final List<NoteGroup> groups;
@@ -43,6 +44,9 @@ class GroupSidebar extends StatelessWidget {
   final VoidCallback onCreate;
   final void Function(GroupAction action, NoteGroup group) onGroupAction;
   final VoidCallback onOpenSettings;
+
+  /// Se reacomodaron los grupos arrastrando su agarradera ≡: así quedaron.
+  final ValueChanged<List<NoteGroup>>? onReorder;
 
   static const double width = 260;
 
@@ -63,14 +67,18 @@ class GroupSidebar extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     Widget item({
+      Key? key,
       required String label,
       required GroupFilter filter,
       required int notes,
       Color? color,
       Color? folderColor,
       NoteGroup? group,
+      int? dragIndex,
     }) =>
         _SidebarItem(
+          key: key,
+          dragIndex: dragIndex,
           label: label,
           color: color,
           folderColor: folderColor,
@@ -101,9 +109,10 @@ class GroupSidebar extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: ListView(
+                child: CustomScrollView(slivers: [
+                  SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  children: [
+                  sliver: SliverList.list(children: [
                     item(
                       label: l10n.groupsAll,
                       filter: GroupFilter.all,
@@ -155,19 +164,47 @@ class GroupSidebar extends StatelessWidget {
                         ],
                       ),
                     ),
-                    for (final group in groups)
-                      item(
-                        label: group.name,
-                        filter: GroupFilter.group(group.name),
-                        notes: counts[group.name] ?? 0,
-                        // Grupo sin color: carpeta gris.
-                        folderColor: group.color == null
-                            ? scheme.onSurfaceVariant
-                            : displayColor(group.color!, theme.brightness),
-                        group: group,
+                  ]),
+                  ),
+                  // Los grupos: se reacomodan arrastrando su agarradera ≡
+                  // (aparece a la izquierda al pasar el mouse).
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                    sliver: SliverReorderableList(
+                      itemCount: groups.length,
+                      itemBuilder: (context, index) {
+                        final group = groups[index];
+                        return item(
+                          key: ValueKey('sidebar-group-${group.name}'),
+                          label: group.name,
+                          filter: GroupFilter.group(group.name),
+                          notes: counts[group.name] ?? 0,
+                          // Grupo sin color: carpeta gris.
+                          folderColor: group.color == null
+                              ? scheme.onSurfaceVariant
+                              : displayColor(group.color!, theme.brightness),
+                          group: group,
+                          dragIndex: onReorder == null ? null : index,
+                        );
+                      },
+                      onReorder: (oldIndex, newIndex) {
+                        final reorder = onReorder;
+                        if (reorder == null) return;
+                        if (newIndex > oldIndex) newIndex -= 1;
+                        if (newIndex == oldIndex) return;
+                        final list = [...groups];
+                        list.insert(newIndex, list.removeAt(oldIndex));
+                        reorder(list);
+                      },
+                      proxyDecorator: (child, index, animation) => Material(
+                        elevation: 4,
+                        color: scheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(10),
+                        child: child,
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                ]),
               ),
               const Divider(height: 1),
               Padding(
@@ -191,6 +228,8 @@ class GroupSidebar extends StatelessWidget {
 /// Una fila de la barra lateral: nombre, contador y (en los grupos) ⋮.
 class _SidebarItem extends StatefulWidget {
   const _SidebarItem({
+    super.key,
+    this.dragIndex,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -213,6 +252,10 @@ class _SidebarItem extends StatefulWidget {
 
   /// Menú del grupo. `null` = no es un grupo (Todas, Sin grupo, Ajustes).
   final void Function(GroupAction action)? onAction;
+
+  /// Se puede reacomodar: su lugar en la lista de grupos. La agarradera ≡
+  /// aparece a la izquierda al pasar el mouse.
+  final int? dragIndex;
 
   @override
   State<_SidebarItem> createState() => _SidebarItemState();
@@ -248,14 +291,46 @@ class _SidebarItemState extends State<_SidebarItem> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final onAction = widget.onAction;
     final textColor = widget.color ?? scheme.onSurface;
+    final dragIndex = widget.dragIndex;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
+      child: dragIndex == null
+          ? _buildRow(context, textColor, onAction)
+          : Stack(
+              children: [
+                _buildRow(context, textColor, onAction),
+                // Toda la franja izquierda (de arriba abajo) sirve para
+                // arrastrar, no solo el ícono ≡.
+                PositionedDirectional(
+                  start: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 22,
+                  child: ReorderableDragStartListener(
+                    index: dragIndex,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.grab,
+                      child: Semantics(
+                        label: context.l10n.reorderGroupHint,
+                        child: const ColoredBox(color: Colors.transparent),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildRow(BuildContext context, Color textColor,
+      void Function(GroupAction)? onAction) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return GestureDetector(
         onSecondaryTapUp: onAction == null
             ? null
             : (details) => _menuAt(details.globalPosition),
@@ -267,17 +342,40 @@ class _SidebarItemState extends State<_SidebarItem> {
           child: ListTile(
             dense: true,
             visualDensity: VisualDensity.compact,
-            contentPadding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+            contentPadding: EdgeInsetsDirectional.only(
+                start: widget.dragIndex == null ? 10 : 0, end: 4),
             minTileHeight: 40,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             selected: widget.selected,
             selectedTileColor: scheme.secondaryContainer,
-            leading: widget.folderColor != null
-                ? GroupFolderIcon(widget.folderColor, size: 18)
-                : widget.icon == null
-                    ? null
-                    : Icon(widget.icon, size: 20, color: textColor),
+            leading: widget.dragIndex != null
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Lugar de la agarradera: siempre reservado, para
+                      // que nada se mueva al pasar el mouse.
+                      SizedBox(
+                        width: 20,
+                        child: _hovered
+                            ? Icon(
+                                Icons.drag_handle,
+                                key: ValueKey('group-drag-${widget.label}'),
+                                size: 18,
+                                color: scheme.onSurfaceVariant,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 4),
+                      if (widget.folderColor != null)
+                        GroupFolderIcon(widget.folderColor, size: 18),
+                    ],
+                  )
+                : widget.folderColor != null
+                    ? GroupFolderIcon(widget.folderColor, size: 18)
+                    : widget.icon == null
+                        ? null
+                        : Icon(widget.icon, size: 20, color: textColor),
             minLeadingWidth: 0,
             horizontalTitleGap: 10,
             title: Text(
@@ -318,7 +416,6 @@ class _SidebarItemState extends State<_SidebarItem> {
             onTap: widget.onTap,
           ),
         ),
-      ),
     );
   }
 }

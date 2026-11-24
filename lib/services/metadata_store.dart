@@ -17,8 +17,11 @@ import '../models/note_group.dart';
 ///     "version": 1,
 ///     "groups": {
 ///       "Recetas": { "color": "orange" }
-///     }
+///     },
+///     "order": ["Rutinas", "Recetas"]
 ///   }
+/// "order" es el orden de los grupos que el usuario acomodó arrastrándolos
+/// (no existe mientras no acomode nada: entonces van en orden alfabético).
 /// Las notas fijadas van en otro archivo, `pins.json`, por vista ("all" =
 /// Todas, "none" = Sin grupo, "g:Recetas" = un grupo), con el id de cada
 /// nota (su fecha de creación, ver `NoteStorage.noteId`), en el orden en
@@ -75,17 +78,47 @@ class MetadataStore {
     });
   }
 
-  /// El grupo cambió de nombre: sus datos lo siguen.
+  /// El grupo cambió de nombre: sus datos lo siguen (y conserva su lugar
+  /// en el orden).
   Future<void> renameGroup(String oldName, String newName) {
     return _update((groups) {
       final entry = groups.remove(oldName);
       if (entry != null) groups[newName] = entry;
+    }, order: (order) {
+      final i = order.indexOf(oldName);
+      if (i >= 0) order[i] = newName;
     });
   }
 
   /// El grupo se borró: se olvidan sus datos.
   Future<void> removeGroup(String name) {
-    return _update((groups) => groups.remove(name));
+    return _update((groups) => groups.remove(name),
+        order: (order) => order.remove(name));
+  }
+
+  /// El orden de los grupos que acomodó el usuario. `null` = nunca lo
+  /// acomodó (van en orden alfabético).
+  Future<List<String>?> groupOrder() async {
+    final order = (await _read())['order'];
+    if (order is! List) return null;
+    return [for (final name in order) if (name is String) name];
+  }
+
+  /// Guarda el orden de los grupos.
+  Future<void> setGroupOrder(List<String> names) {
+    return _update((_) {}, order: (order) {
+      order
+        ..clear()
+        ..addAll(names);
+    }, createOrder: true);
+  }
+
+  /// Se creó un grupo: si ya hay un orden, va al final.
+  Future<void> addToGroupOrder(String name) async {
+    if (await groupOrder() == null) return;
+    await _update((_) {}, order: (order) {
+      if (!order.contains(name)) order.add(name);
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -190,13 +223,28 @@ class MetadataStore {
     }
   }
 
+  /// [order]: cambia también el orden de los grupos, si ya existe (o si
+  /// [createOrder]).
   Future<void> _update(
-      void Function(Map<String, dynamic> groups) change) async {
+    void Function(Map<String, dynamic> groups) change, {
+    void Function(List<dynamic> order)? order,
+    bool createOrder = false,
+  }) async {
     final data = await _read();
     final groups = data['groups'] is Map<String, dynamic>
         ? data['groups'] as Map<String, dynamic>
         : <String, dynamic>{};
     change(groups);
+    if (order != null) {
+      final current = data['order'];
+      if (current is List) {
+        order(current);
+      } else if (createOrder) {
+        final created = <dynamic>[];
+        order(created);
+        data['order'] = created;
+      }
+    }
     data['version'] = _version;
     data['groups'] = groups;
     await _writeFile(_file, data);

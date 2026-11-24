@@ -558,4 +558,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get otherNotes => 'Others';
+
+  @override
+  String get reorderGroupHint => 'Drag to reorder';
 }

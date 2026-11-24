@@ -1021,6 +1021,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Others'**
   String get otherNotes;
+
+  /// Label of the ≡ handle next to each group: drag it to change the order of the groups.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get reorderGroupHint;
 }
 
 class _AppLocalizationsDelegate

@@ -508,5 +508,7 @@
   "pinnedNotes": "Pinned",
   "@pinnedNotes": {"description": "Header above the pinned notes in the list (also the label of the pin icon)."},
   "otherNotes": "Others",
-  "@otherNotes": {"description": "Header above the rest of the notes, below the pinned ones."}
+  "@otherNotes": {"description": "Header above the rest of the notes, below the pinned ones."},
+  "reorderGroupHint": "Drag to reorder",
+  "@reorderGroupHint": {"description": "Label of the ≡ handle next to each group: drag it to change the order of the groups."}
 }

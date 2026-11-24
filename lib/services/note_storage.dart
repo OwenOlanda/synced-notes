@@ -337,15 +337,27 @@ class NoteStorage {
   // Grupos
   // ---------------------------------------------------------------------------
 
-  /// Todos los grupos, en orden alfabético, con su color.
+  /// Todos los grupos, con su color, en el orden que acomodó el usuario
+  /// (los que no están en ese orden, ej. creados desde el explorador, van al
+  /// final en orden alfabético). Si nunca lo acomodó: orden alfabético.
   Future<List<NoteGroup>> listGroups() async {
     await _ensureFolder();
     final colors = await metadata.groupColors();
+    final names = await _groupNames(); // alfabético
+    final order = await metadata.groupOrder() ?? const <String>[];
+    final ordered = [
+      ...order.where(names.contains),
+      ...names.where((n) => !order.contains(n)),
+    ];
     return [
-      for (final name in await _groupNames())
-        NoteGroup(name: name, color: colors[name]),
+      for (final name in ordered) NoteGroup(name: name, color: colors[name]),
     ];
   }
+
+  /// Guarda el orden de los grupos (sus nombres, como quedaron al
+  /// arrastrarlos).
+  Future<void> reorderGroups(List<String> names) =>
+      metadata.setGroupOrder(names);
 
   /// Crea un grupo vacío (una carpeta). Devuelve el grupo creado.
   Future<NoteGroup> createGroup(String name,
@@ -353,6 +365,8 @@ class NoteStorage {
     final trimmed = await _checkNewGroupName(name);
     await _dirFor(trimmed).create(recursive: true);
     if (color != null) await metadata.setGroupColor(trimmed, color);
+    await metadata.addToGroupOrder(trimmed); // al final
+
     return NoteGroup(name: trimmed, color: color);
   }
 

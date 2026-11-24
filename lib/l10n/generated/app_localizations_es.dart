@@ -559,4 +559,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get otherNotes => 'Otras';
+
+  @override
+  String get reorderGroupHint => 'Arrastra para cambiar el orden';
 }

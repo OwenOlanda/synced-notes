@@ -477,6 +477,18 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
   }
 
+  /// Se reacomodaron los grupos (arrastrando su agarradera): se ven así de
+  /// inmediato y se guarda el orden (viaja con la sincronización).
+  Future<void> _reorderGroups(List<NoteGroup> groups) async {
+    setState(() => _groups = groups);
+    try {
+      await widget.storage.reorderGroups([for (final g in groups) g.name]);
+    } catch (e) {
+      _showError(e);
+      await _load();
+    }
+  }
+
   Future<void> _select(GroupFilter filter) async {
     _searchScope = null; // la búsqueda vuelve a ser "en lo que se ve"
     await widget.settings.setSelectedGroup(filter);
@@ -1000,6 +1012,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     onSelect: _select,
                     onCreate: _createGroup,
                     onGroupAction: _onGroupAction,
+                    onReorder: _reorderGroups,
                   ),
                 ),
               ],
@@ -1108,6 +1121,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
             onCreate: _createGroup,
             onGroupAction: _onGroupAction,
             onOpenSettings: _openSettings,
+            onReorder: _reorderGroups,
             ),
           ),
           const VerticalDivider(width: 1),

@@ -153,5 +153,6 @@
   "pinNote": "Fijar",
   "unpinNote": "Desfijar",
   "pinnedNotes": "Fijadas",
-  "otherNotes": "Otras"
+  "otherNotes": "Otras",
+  "reorderGroupHint": "Arrastra para cambiar el orden"
 }

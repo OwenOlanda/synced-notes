@@ -40,6 +40,7 @@ class GroupPanel extends StatefulWidget {
     required this.onSelect,
     required this.onCreate,
     required this.onGroupAction,
+    this.onReorder,
   });
 
   final List<NoteGroup> groups;
@@ -52,6 +53,9 @@ class GroupPanel extends StatefulWidget {
   final ValueChanged<GroupFilter> onSelect;
   final VoidCallback onCreate;
   final void Function(GroupAction action, NoteGroup group) onGroupAction;
+
+  /// Se reacomodaron los grupos arrastrando su agarradera ≡: así quedaron.
+  final ValueChanged<List<NoteGroup>>? onReorder;
 
   /// Alto del panel cerrado (sin contar el borde inferior del sistema).
   static const double collapsedHeight = 112;
@@ -156,7 +160,22 @@ class _GroupPanelState extends State<GroupPanel> {
   void _close() {
     FocusScope.of(context).unfocus();
     if (_search.text.isNotEmpty) setState(_search.clear);
+    _scrollListToTop();
     _animateTo(_minSize);
+  }
+
+  /// El desplazamiento de la lista del panel (lo da el panel al dibujarse).
+  ScrollController? _sheetScroll;
+
+  /// Regresa la lista del panel hasta arriba. Si se cerraba con la lista
+  /// desplazada (por ejemplo, tras bajar para ver todos los grupos), el
+  /// panel cerrado se quedaba "a medias": sin el asa y con los chips
+  /// cortados.
+  void _scrollListToTop() {
+    final scroll = _sheetScroll;
+    if (scroll != null && scroll.hasClients && scroll.offset != 0) {
+      scroll.jumpTo(0);
+    }
   }
 
   void _toggle() => _isOpen ? _close() : _open();
@@ -217,6 +236,8 @@ class _GroupPanelState extends State<GroupPanel> {
       if (!isOpen) {
         _searchFocus.unfocus();
         _search.clear();
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => mounted ? _scrollListToTop() : null);
       }
       setState(() => _isOpen = isOpen);
     }
@@ -274,6 +295,7 @@ class _GroupPanelState extends State<GroupPanel> {
   }
 
   Widget _buildSheet(BuildContext context, ScrollController scroll) {
+    _sheetScroll = scroll;
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -353,16 +375,7 @@ class _GroupPanelState extends State<GroupPanel> {
             ),
           ),
           SliverPadding(
-            // Con el teclado abierto, espacio extra abajo para poder
-            // desplazar los últimos grupos por encima del teclado (la
-            // pantalla ya no se encoge con él).
-            padding: EdgeInsets.fromLTRB(
-                8,
-                0,
-                8,
-                24 +
-                    MediaQuery.paddingOf(context).bottom +
-                    MediaQuery.viewInsetsOf(context).bottom),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             sliver: SliverList.list(children: [
               if (!searching) ...[
                 _tile(
@@ -378,14 +391,17 @@ class _GroupPanelState extends State<GroupPanel> {
                 if (widget.groups.isNotEmpty)
                   const Divider(indent: 12, endIndent: 12),
               ],
-              for (final group in matches)
-                _tile(
-                  label: group.name,
-                  folderColor: folderOf(group),
-                  filter: GroupFilter.group(group.name),
-                  notes: widget.counts[group.name] ?? 0,
-                  group: group,
-                ),
+              // Buscando: la lista filtrada, sin agarraderas (reacomodar
+              // una lista a medias no tendría sentido).
+              if (searching)
+                for (final group in matches)
+                  _tile(
+                    label: group.name,
+                    folderColor: folderOf(group),
+                    filter: GroupFilter.group(group.name),
+                    notes: widget.counts[group.name] ?? 0,
+                    group: group,
+                  ),
               if (searching && matches.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24),
@@ -397,6 +413,44 @@ class _GroupPanelState extends State<GroupPanel> {
                   ),
                 ),
             ]),
+          ),
+          // Los grupos, cada uno con su agarradera ≡ a la izquierda: se
+          // arrastra desde ahí para cambiar el orden.
+          if (!searching)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              sliver: SliverReorderableList(
+                itemCount: widget.groups.length,
+                itemBuilder: (context, index) {
+                  final group = widget.groups[index];
+                  return _tile(
+                    key: ValueKey('group-tile-${group.name}'),
+                    label: group.name,
+                    folderColor: folderOf(group),
+                    filter: GroupFilter.group(group.name),
+                    notes: widget.counts[group.name] ?? 0,
+                    group: group,
+                    dragIndex: widget.onReorder == null ? null : index,
+                  );
+                },
+                onReorder: _reorder,
+                proxyDecorator: (child, index, animation) => Material(
+                  elevation: 6,
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                  child: child,
+                ),
+              ),
+            ),
+          // Con el teclado abierto, espacio extra abajo para poder
+          // desplazar los últimos grupos por encima del teclado (la
+          // pantalla ya no se encoge con él).
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 24 +
+                  MediaQuery.paddingOf(context).bottom +
+                  MediaQuery.viewInsetsOf(context).bottom,
+            ),
           ),
         ],
       ),
@@ -529,26 +583,62 @@ class _GroupPanelState extends State<GroupPanel> {
     );
   }
 
+  void _reorder(int oldIndex, int newIndex) {
+    final onReorder = widget.onReorder;
+    if (onReorder == null) return;
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (newIndex == oldIndex) return;
+    final groups = [...widget.groups];
+    groups.insert(newIndex, groups.removeAt(oldIndex));
+    onReorder(groups);
+  }
+
   /// Una fila de la lista completa de grupos (panel abierto).
+  /// [dragIndex]: lleva agarradera ≡ para reacomodarla (su lugar en la
+  /// lista).
   Widget _tile({
+    Key? key,
     required String label,
     required GroupFilter filter,
     required int notes,
     Color? folderColor,
     NoteGroup? group,
+    int? dragIndex,
   }) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isSelected = filter == widget.selected;
-    return ListTile(
+    final folder =
+        folderColor == null ? null : GroupFolderIcon(folderColor, size: 20);
+    final tile = ListTile(
+      key: dragIndex == null ? key : null,
+      // Con agarradera: va hasta la orilla izquierda de la fila.
+      contentPadding: dragIndex == null
+          ? null
+          : const EdgeInsetsDirectional.only(start: 4, end: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       selected: isSelected,
       selectedColor: scheme.onSurface,
       selectedTileColor: scheme.secondaryContainer,
-      leading: folderColor == null
-          ? null
-          : GroupFolderIcon(folderColor, size: 20),
+      leading: dragIndex == null
+          ? folder
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    Icons.drag_handle,
+                    key: ValueKey('group-drag-$label'),
+                    size: 22,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (folder != null) folder,
+              ],
+            ),
       minLeadingWidth: 0,
       title: Text(
         label,
@@ -574,7 +664,37 @@ class _GroupPanelState extends State<GroupPanel> {
       ),
       onTap: () => _select(filter),
     );
+    if (dragIndex == null) return tile;
+    // Toda la franja izquierda de la fila (de arriba abajo, hasta antes de
+    // la carpetita) sirve para arrastrar, no solo el ícono ≡. Tocar ahí ya
+    // no elige el grupo; el resto de la fila sí.
+    return Stack(
+      key: key,
+      children: [
+        tile,
+        PositionedDirectional(
+          start: 0,
+          top: 0,
+          bottom: 0,
+          width: _dragZoneWidth,
+          child: ReorderableDragStartListener(
+            index: dragIndex,
+            child: Semantics(
+              label: l10n.reorderGroupHint,
+              child: ColoredBox(
+                key: ValueKey('group-drag-zone-$label'),
+                color: Colors.transparent,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
+
+  /// Ancho de la franja para arrastrar: desde la orilla hasta justo antes
+  /// de la carpetita (4 de margen + 30 del ícono ≡ con su relleno + 6).
+  static const double _dragZoneWidth = 40;
 
   List<PopupMenuEntry<GroupAction>> _menuItems(BuildContext context) {
     final l10n = context.l10n;

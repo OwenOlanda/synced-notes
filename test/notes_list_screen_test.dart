@@ -1,4 +1,4 @@
-import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/gestures.dart' show PointerDeviceKind, kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1370,6 +1370,146 @@ void main() {
       // El orden es el de siempre: Primera antes que Segunda.
       expect(yOf(tester, find.text('Primera')),
           lessThan(yOf(tester, find.text('Segunda'))));
+    });
+  });
+
+  group('orden de los grupos', () {
+    final notes = [
+      _note(title: 'Tacos', group: 'Recetas'),
+      _note(title: 'Querida tía', group: 'Cartas'),
+    ];
+    const groups = [
+      NoteGroup(name: 'Recetas', color: GroupColor.orange),
+      NoteGroup(name: 'Cartas'),
+    ];
+
+    Future<void> dragBy(WidgetTester tester, Finder handle, double dy,
+        {PointerDeviceKind kind = PointerDeviceKind.touch}) async {
+      final gesture =
+          await tester.startGesture(tester.getCenter(handle), kind: kind);
+      await tester.pump();
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(Offset(0, dy / 10));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('arrastrar la agarradera ≡ reacomoda los grupos y los chips',
+        (tester) async {
+      final storage = await showList(tester, notes: notes, groups: groups);
+      // Al principio, alfabético: Cartas, Recetas.
+      expect(tester.getTopLeft(chipOf('Cartas')).dx,
+          lessThan(tester.getTopLeft(chipOf('Recetas')).dx));
+      await openPanel(tester);
+
+      final handle = inPanel(find.byKey(const ValueKey('group-drag-Cartas')));
+      expect(handle, findsOneWidget);
+      // La agarradera va a la izquierda de la carpetita.
+      final row = tileOf('Cartas');
+      expect(tester.getCenter(handle).dx,
+          lessThan(tester.getCenter(find.descendant(
+                  of: row, matching: find.byType(GroupFolderIcon)))
+              .dx));
+
+      await dragBy(tester, handle, 80); // Cartas baja, debajo de Recetas
+      expect(storage.order, ['Recetas', 'Cartas']);
+      expect(tester.getTopLeft(tileOf('Recetas')).dy,
+          lessThan(tester.getTopLeft(tileOf('Cartas')).dy));
+      expect(tester.getTopLeft(chipOf('Recetas')).dx,
+          lessThan(tester.getTopLeft(chipOf('Cartas')).dx));
+    });
+
+    testWidgets('se arrastra desde cualquier punto de la franja izquierda',
+        (tester) async {
+      final storage = await showList(tester, notes: notes, groups: groups);
+      await openPanel(tester);
+      final zone =
+          inPanel(find.byKey(const ValueKey('group-drag-zone-Cartas')));
+      // Arriba a la izquierda de la franja, lejos del ícono ≡.
+      final corner = tester.getTopLeft(zone) + const Offset(3, 3);
+      final gesture = await tester.startGesture(corner);
+      await tester.pump();
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, 8));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(storage.order, ['Recetas', 'Cartas']);
+    });
+
+    testWidgets('buscando un grupo no hay agarraderas', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await openPanel(tester);
+      expect(inPanel(find.byIcon(Icons.drag_handle)), findsNWidgets(2));
+      await tester.enterText(inPanel(find.byType(TextField)), 'Rec');
+      await tester.pumpAndSettle();
+      expect(inPanel(find.byIcon(Icons.drag_handle)), findsNothing);
+      expect(tileOf('Recetas'), findsOneWidget);
+    });
+
+    testWidgets('bug: con la lista de grupos desplazada, elegir uno cierra '
+        'el panel del todo (con el asa y los chips a la vista)',
+        (tester) async {
+      final many = [
+        for (var i = 1; i <= 15; i++)
+          NoteGroup(name: 'Grupo ${i.toString().padLeft(2, '0')}'),
+      ];
+      await showList(tester, notes: notes, groups: many);
+      final closedHandle = tester.getTopLeft(find.text('Grupos de notas'));
+      await openPanel(tester);
+
+      // Bajar hasta los últimos grupos.
+      await tester.drag(tileOf('Grupo 02'), const Offset(0, -700));
+      await tester.pumpAndSettle();
+      final list = find
+          .descendant(
+              of: find.byType(GroupPanel), matching: find.byType(Scrollable))
+          .first;
+      expect(tester.state<ScrollableState>(list).position.pixels,
+          greaterThan(0));
+
+      await tester.tap(tileOf('Grupo 14'));
+      await tester.pumpAndSettle();
+      expect(scrim, findsNothing);
+      expect(settings.selectedGroup, const GroupFilter.group('Grupo 14'));
+      expect(tester.state<ScrollableState>(list).position.pixels, 0);
+      expect(tester.getTopLeft(find.text('Grupos de notas')), closedHandle);
+    });
+
+    testWidgets('PC: la agarradera aparece al pasar el mouse y reacomoda',
+        (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final storage = await showList(tester, notes: notes, groups: groups);
+      final sidebar = find.byType(GroupSidebar);
+      final handle = find.descendant(
+          of: sidebar, matching: find.byKey(const ValueKey('group-drag-Cartas')));
+      expect(handle, findsNothing);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(tester.getCenter(
+          find.descendant(of: sidebar, matching: find.text('Cartas'))));
+      await tester.pumpAndSettle();
+      expect(handle, findsOneWidget);
+
+      // Arrastrar la agarradera hacia abajo con el mismo mouse.
+      await mouse.moveTo(tester.getCenter(handle));
+      await tester.pump();
+      await mouse.down(tester.getCenter(handle));
+      await tester.pump();
+      for (var i = 0; i < 10; i++) {
+        await mouse.moveBy(const Offset(0, 6));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await mouse.up();
+      await tester.pumpAndSettle();
+      expect(storage.order, ['Recetas', 'Cartas']);
     });
   });
 }

@@ -459,4 +459,52 @@ void main() {
       expect(entries(), isEmpty);
     });
   });
+
+  group('orden de los grupos (.synced-notes/groups.json)', () {
+    Future<List<String>> names() async =>
+        [for (final g in await storage.listGroups()) g.name];
+
+    test('sin acomodar: alfabético, y los nuevos se acomodan solos', () async {
+      await storage.createGroup('Recetas');
+      await storage.createGroup('Arte');
+      expect(await names(), ['Arte', 'Recetas']);
+      expect(await storage.metadata.groupOrder(), isNull);
+    });
+
+    test('se guarda el orden; los nuevos van al final', () async {
+      for (final n in ['Arte', 'Cartas', 'Recetas']) {
+        await storage.createGroup(n);
+      }
+      await storage.reorderGroups(['Recetas', 'Arte', 'Cartas']);
+      expect(await names(), ['Recetas', 'Arte', 'Cartas']);
+      final data = jsonDecode(File(
+              '${tempDir.path}$sep.synced-notes${sep}groups.json')
+          .readAsStringSync());
+      expect(data['order'], ['Recetas', 'Arte', 'Cartas']);
+
+      await storage.createGroup('Abc'); // alfabéticamente iría primero
+      expect(await names(), ['Recetas', 'Arte', 'Cartas', 'Abc']);
+    });
+
+    test('renombrar conserva el lugar; borrar lo quita del orden', () async {
+      for (final n in ['Arte', 'Cartas', 'Recetas']) {
+        await storage.createGroup(n);
+      }
+      await storage.reorderGroups(['Recetas', 'Arte', 'Cartas']);
+      await storage.renameGroup('Arte', 'Pintura');
+      expect(await names(), ['Recetas', 'Pintura', 'Cartas']);
+      await storage.deleteGroup('Recetas', deleteNotes: true);
+      expect(await names(), ['Pintura', 'Cartas']);
+      expect(await storage.metadata.groupOrder(), ['Pintura', 'Cartas']);
+    });
+
+    test('un grupo creado desde el explorador va al final', () async {
+      for (final n in ['Cartas', 'Recetas']) {
+        await storage.createGroup(n);
+      }
+      await storage.reorderGroups(['Recetas', 'Cartas']);
+      Directory('${tempDir.path}${sep}Bocetos').createSync();
+      expect(await names(), ['Recetas', 'Cartas', 'Bocetos']);
+    });
+  });
 }

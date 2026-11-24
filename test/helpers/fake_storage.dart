@@ -34,9 +34,24 @@ class FakeStorage extends NoteStorage {
     pinned ? ids.add(NoteStorage.noteId(note)) : ids.remove(NoteStorage.noteId(note));
   }
 
+  /// Orden de los grupos acomodado por el usuario (`null` = alfabético).
+  List<String>? order;
+
   @override
-  Future<List<NoteGroup>> listGroups() async => [...groups]
-    ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  Future<List<NoteGroup>> listGroups() async {
+    final sorted = [...groups]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final o = order;
+    if (o == null) return sorted;
+    return [
+      for (final name in o)
+        ...sorted.where((g) => g.name == name),
+      ...sorted.where((g) => !o.contains(g.name)),
+    ];
+  }
+
+  @override
+  Future<void> reorderGroups(List<String> names) async => order = [...names];
 
   @override
   Future<void> deleteNote(String fileName, {String? group}) async {
