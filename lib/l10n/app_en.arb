@@ -500,5 +500,13 @@
   "textZoomOut": "Smaller",
   "@textZoomOut": {"description": "Settings → Text size: button that makes the text smaller."},
   "textZoomReset": "Back to 100%",
-  "@textZoomReset": {"description": "Settings → Text size: button that returns the text to its normal size."}
+  "@textZoomReset": {"description": "Settings → Text size: button that returns the text to its normal size."},
+  "pinNote": "Pin",
+  "@pinNote": {"description": "Note menu: pin the note at the top of the current view (All, No group or a group)."},
+  "unpinNote": "Unpin",
+  "@unpinNote": {"description": "Note menu: stop pinning the note in the current view."},
+  "pinnedNotes": "Pinned",
+  "@pinnedNotes": {"description": "Header above the pinned notes in the list (also the label of the pin icon)."},
+  "otherNotes": "Others",
+  "@otherNotes": {"description": "Header above the rest of the notes, below the pinned ones."}
 }

@@ -9,6 +9,7 @@ import 'package:synced_notes/models/note_group.dart';
 import 'package:synced_notes/screens/note_editor_screen.dart';
 import 'package:synced_notes/screens/notes_list_screen.dart';
 import 'package:synced_notes/services/app_settings.dart';
+import 'package:synced_notes/services/note_storage.dart';
 import 'package:synced_notes/widgets/group_colors.dart';
 import 'package:synced_notes/widgets/group_panel.dart';
 import 'package:synced_notes/widgets/group_sidebar.dart';
@@ -1274,6 +1275,101 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(GroupSidebar), findsNothing);
       expect(find.byType(GroupPanel), findsOneWidget);
+    });
+  });
+
+  group('notas fijadas', () {
+    // Cada una con su propia fecha de creación (así se reconocen los pins).
+    Note dated(String title, int second, {String? group}) {
+      final date = DateTime(2026, 10, 3, 20, 59, second);
+      return Note(
+        fileName: NoteStorage.fileNameFor(title, date),
+        group: group,
+        title: title,
+        content: 'texto',
+        createdAt: date,
+        modifiedAt: date,
+      );
+    }
+
+    final notes = [
+      dated('Primera', 3),
+      dated('Segunda', 2),
+      dated('Tacos', 1, group: 'Recetas'),
+    ];
+    const groups = [NoteGroup(name: 'Recetas', color: GroupColor.orange)];
+    final pinnedHeader = find.byKey(const ValueKey('pinned-header'));
+    final othersHeader = find.byKey(const ValueKey('others-header'));
+    final pinIcons = find.byKey(const ValueKey('note-pin-icon'));
+
+    Future<void> togglePin(WidgetTester tester, String title,
+        {String action = 'Fijar'}) async {
+      await tester.longPress(find.text(title));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(action));
+      await tester.pumpAndSettle();
+    }
+
+    double yOf(WidgetTester tester, Finder finder) =>
+        tester.getTopLeft(finder).dy;
+
+    testWidgets('fijar sube la nota con su alfiler, bajo "Fijadas"',
+        (tester) async {
+      final storage = await showList(tester, notes: notes, groups: groups);
+      expect(pinnedHeader, findsNothing); // sin fijadas, la lista de siempre
+      expect(pinIcons, findsNothing);
+
+      await togglePin(tester, 'Tacos');
+      expect(pinnedHeader, findsOneWidget);
+      expect(othersHeader, findsOneWidget);
+      expect(pinIcons, findsOneWidget);
+      // Fijadas → Tacos → Otras → Primera → Segunda.
+      expect(yOf(tester, pinnedHeader), lessThan(yOf(tester, find.text('Tacos'))));
+      expect(yOf(tester, find.text('Tacos')), lessThan(yOf(tester, othersHeader)));
+      expect(yOf(tester, othersHeader),
+          lessThan(yOf(tester, find.text('Primera'))));
+      expect(storage.pins['all'], {'2026-10-03_20-59-01'});
+
+      // El menú ahora dice "Desfijar".
+      await togglePin(tester, 'Tacos', action: 'Desfijar');
+      expect(pinnedHeader, findsNothing);
+      expect(pinIcons, findsNothing);
+      expect(storage.pins['all'], isEmpty);
+    });
+
+    testWidgets('cada vista tiene sus propias fijadas', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await togglePin(tester, 'Tacos'); // en Todas
+
+      await choose(tester, 'Recetas');
+      expect(pinIcons, findsNothing); // en Recetas no está fijada
+      expect(pinnedHeader, findsNothing);
+      await togglePin(tester, 'Tacos');
+      expect(pinIcons, findsOneWidget);
+      // Todas solo tiene una nota fijada y aquí todas son fijadas: sin
+      // "Otras".
+      expect(othersHeader, findsNothing);
+
+      await choose(tester, 'Todas');
+      expect(pinIcons, findsOneWidget);
+      await togglePin(tester, 'Tacos', action: 'Desfijar');
+      await choose(tester, 'Recetas');
+      expect(pinIcons, findsOneWidget); // en Recetas sigue fijada
+    });
+
+    testWidgets('buscando, las fijadas no van aparte', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await togglePin(tester, 'Segunda');
+      await tester.tap(find.byTooltip('Buscar notas'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const ValueKey('search-field')), 'texto');
+      await tester.pumpAndSettle();
+      expect(pinnedHeader, findsNothing);
+      expect(othersHeader, findsNothing);
+      // El orden es el de siempre: Primera antes que Segunda.
+      expect(yOf(tester, find.text('Primera')),
+          lessThan(yOf(tester, find.text('Segunda'))));
     });
   });
 }

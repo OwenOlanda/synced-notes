@@ -59,9 +59,20 @@ class NotesListScreen extends StatefulWidget {
   State<NotesListScreen> createState() => _NotesListScreenState();
 }
 
+/// Encabezados de la lista cuando hay notas fijadas.
+enum _Section { pinned, others }
+
 class _NotesListScreenState extends State<NotesListScreen> {
   List<Note>? _notes; // null = cargando
   List<NoteGroup> _groups = const [];
+
+  /// Notas fijadas de cada vista: vista ([GroupFilter.encode]) → ids
+  /// ([NoteStorage.noteId]).
+  Map<String, Set<String>> _pins = const {};
+
+  /// ¿Está fijada [note] en lo que se ve?
+  bool _isPinned(Note note) =>
+      _pins[_scope.encode()]?.contains(NoteStorage.noteId(note)) ?? false;
   Object? _loadError; // el texto se arma en build(), en el idioma actual
 
   /// Vista de PC: la nota abierta en la columna del editor (`null` =
@@ -179,7 +190,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
     final all = _notes ?? const <Note>[];
     final search = _search;
     final scoped = all.where(_scope.matches);
-    if (search.isEmpty) return scoped.toList();
+    // Sin buscar: las fijadas de esta vista, arriba. Buscando, los pins no
+    // cuentan (primero las que coinciden en el título).
+    if (search.isEmpty) {
+      return [
+        ...scoped.where(_isPinned),
+        ...scoped.where((n) => !_isPinned(n)),
+      ];
+    }
     final found = scoped.where(search.matches).toList();
     return [
       ...found.where(search.matchesTitle),
@@ -438,10 +456,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
     try {
       final notes = await widget.storage.listNotes();
       final groups = await widget.storage.listGroups();
+      final pins = await widget.storage.listPins();
       if (!mounted) return;
       setState(() {
         _notes = notes;
         _groups = groups;
+        _pins = pins;
         _loadError = null;
       });
       // El grupo que se estaba viendo ya no existe (ej. se borró desde
@@ -587,15 +607,39 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   Future<void> _showNoteMenu(Note note, Offset position) async {
     final l10n = context.l10n;
+    final pinned = _isPinned(note);
     final choice = await _menuAt(position, [
+      PopupMenuItem(
+        value: 'pin',
+        child: Text(pinned ? l10n.unpinNote : l10n.pinNote),
+      ),
       PopupMenuItem(value: 'move', child: Text(l10n.moveTo)),
       PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
     ]);
     switch (choice) {
+      case 'pin':
+        await _setPinned(note, !pinned);
       case 'move':
         await _move(note);
       case 'delete':
         await _delete(note);
+    }
+  }
+
+  /// Fija (o desfija) una nota en lo que se ve. La lista cambia de
+  /// inmediato; si no se pudo guardar, se avisa y se vuelve a leer.
+  Future<void> _setPinned(Note note, bool pinned) async {
+    final view = _scope;
+    final id = NoteStorage.noteId(note);
+    final ids = {...?_pins[view.encode()]};
+    pinned ? ids.add(id) : ids.remove(id);
+    setState(() => _pins = {..._pins, view.encode(): ids});
+    try {
+      await widget.storage.setPinned(view, note, pinned);
+    } catch (e) {
+      _showError(e);
+      final pins = await widget.storage.listPins();
+      if (mounted) setState(() => _pins = pins);
     }
   }
 
@@ -1287,13 +1331,37 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
     // El grupo de cada nota se muestra cuando la lista mezcla grupos.
     final showGroup = _scope.isAll;
+    // Con notas fijadas (y sin buscar): "Fijadas" arriba y "Otras" abajo.
+    final pinnedCount =
+        search.isEmpty ? notes.takeWhile(_isPinned).length : 0;
+    final items = <Object>[
+      if (pinnedCount > 0) _Section.pinned,
+      ...notes.take(pinnedCount),
+      if (pinnedCount > 0 && pinnedCount < notes.length) _Section.others,
+      ...notes.skip(pinnedCount),
+    ];
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(8, 4, 8, bottomSpace),
-      itemCount: notes.length,
+      itemCount: items.length,
       itemBuilder: (context, index) {
-        final note = notes[index];
+        final item = items[index];
+        if (item is _Section) {
+          final pinnedHeader = item == _Section.pinned;
+          return Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(
+                22, pinnedHeader ? 8 : 16, 12, 4),
+            child: Text(
+              pinnedHeader ? l10n.pinnedNotes : l10n.otherNotes,
+              key: ValueKey(pinnedHeader ? 'pinned-header' : 'others-header'),
+              style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant),
+            ),
+          );
+        }
+        final note = item as Note;
         final group = note.group;
         return NoteRow(
+          pinned: _isPinned(note),
           note: note,
           groupColor: group == null ? null : _colorOf(group, theme),
           showGroup: showGroup,

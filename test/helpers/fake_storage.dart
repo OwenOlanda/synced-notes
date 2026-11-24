@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:synced_notes/models/group_filter.dart';
 import 'package:synced_notes/models/note_group.dart';
 import 'package:synced_notes/models/note.dart';
 import 'package:synced_notes/services/note_storage.dart';
@@ -17,8 +18,21 @@ class FakeStorage extends NoteStorage {
   final List<Note> notes;
   final List<NoteGroup> groups;
 
+  /// Notas fijadas: vista → ids (como en NoteStorage).
+  final Map<String, Set<String>> pins = {};
+
   @override
   Future<List<Note>> listNotes() async => [...notes];
+
+  @override
+  Future<Map<String, Set<String>>> listPins() async =>
+      {for (final e in pins.entries) e.key: {...e.value}};
+
+  @override
+  Future<void> setPinned(GroupFilter view, Note note, bool pinned) async {
+    final ids = pins.putIfAbsent(view.encode(), () => {});
+    pinned ? ids.add(NoteStorage.noteId(note)) : ids.remove(NoteStorage.noteId(note));
+  }
 
   @override
   Future<List<NoteGroup>> listGroups() async => [...groups]

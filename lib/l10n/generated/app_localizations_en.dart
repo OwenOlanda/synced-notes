@@ -546,4 +546,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get textZoomReset => 'Back to 100%';
+
+  @override
+  String get pinNote => 'Pin';
+
+  @override
+  String get unpinNote => 'Unpin';
+
+  @override
+  String get pinnedNotes => 'Pinned';
+
+  @override
+  String get otherNotes => 'Others';
 }

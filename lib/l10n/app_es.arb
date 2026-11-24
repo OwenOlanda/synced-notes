@@ -149,5 +149,9 @@
   "textZoomPercent": "{percent}%",
   "textZoomIn": "Más grande",
   "textZoomOut": "Más chico",
-  "textZoomReset": "Volver a 100%"
+  "textZoomReset": "Volver a 100%",
+  "pinNote": "Fijar",
+  "unpinNote": "Desfijar",
+  "pinnedNotes": "Fijadas",
+  "otherNotes": "Otras"
 }

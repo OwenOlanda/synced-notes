@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import '../models/note_group.dart';
+import '../models/group_filter.dart';
 import '../models/note.dart';
 import 'metadata_store.dart';
 
@@ -168,6 +169,11 @@ class NoteStorage {
         '_${two(c.hour)}-${two(c.minute)}-${two(c.second)}';
   }
 
+  /// Con qué se reconoce una nota en los datos de la app (pins): su fecha
+  /// de creación, `2026-10-03_20-59-12`. No cambia aunque cambie el título o
+  /// el grupo, y no hay dos notas con la misma.
+  static String noteId(Note note) => _stamp(note.createdAt);
+
   /// Nombre de archivo para un título y una fecha de creación.
   static String fileNameFor(String title, DateTime createdAt) {
     final stamp = _stamp(createdAt);
@@ -278,7 +284,9 @@ class NoteStorage {
   Future<void> deleteNote(String fileName, {String? group}) async {
     final file = _file(fileName, group);
     if (await file.exists()) {
+      final note = await _readFile(file, group);
       await file.delete();
+      await metadata.unpin(noteId(note)); // de todas las vistas
     }
   }
 
@@ -302,8 +310,28 @@ class NoteStorage {
       throw NoteStorageException(NoteError.duplicateName);
     }
     await source.rename(target.path);
+    // Ya no está en su grupo anterior: deja de estar fijada ahí (en
+    // "Todas" sigue fijada).
+    await metadata.unpin(noteId(note), view: _viewOf(note.group));
     return _readFile(target, toGroup);
   }
+
+  // ---------------------------------------------------------------------------
+  // Notas fijadas
+  // ---------------------------------------------------------------------------
+
+  /// Las notas fijadas de cada vista: vista ([GroupFilter.encode]) → ids
+  /// ([noteId]).
+  Future<Map<String, Set<String>>> listPins() async =>
+      (await metadata.pins()).map((view, ids) => MapEntry(view, ids.toSet()));
+
+  /// Fija (o desfija) [note] en la vista [view].
+  Future<void> setPinned(GroupFilter view, Note note, bool pinned) =>
+      metadata.setPinned(view.encode(), noteId(note), pinned);
+
+  /// La vista donde vive una nota de este grupo (`null` = Sin grupo).
+  static String _viewOf(String? group) =>
+      (group == null ? GroupFilter.none : GroupFilter.group(group)).encode();
 
   // ---------------------------------------------------------------------------
   // Grupos
@@ -348,6 +376,7 @@ class NoteStorage {
         await oldDir.rename(_dirFor(trimmed).path);
       }
       await metadata.renameGroup(oldName, trimmed);
+      await metadata.renamePinView(_viewOf(oldName), _viewOf(trimmed));
     }
     final colors = await metadata.groupColors();
     return NoteGroup(name: trimmed, color: colors[trimmed]);
@@ -374,7 +403,14 @@ class NoteStorage {
       throw NoteStorageException(NoteError.groupNotFound);
     }
 
-    if (!deleteNotes) {
+    if (deleteNotes) {
+      // Sus notas se van: se desfijan de todas las vistas.
+      await for (final entity in dir.list()) {
+        if (entity is File && _isNoteFile(entity)) {
+          await metadata.unpin(noteId(await _readFile(entity, name)));
+        }
+      }
+    } else {
       final notes = [
         await for (final entity in dir.list())
           if (entity is File && _isNoteFile(entity)) entity,
@@ -392,6 +428,7 @@ class NoteStorage {
 
     await dir.delete(recursive: true);
     await metadata.removeGroup(name);
+    await metadata.removePinView(_viewOf(name));
   }
 
   // ---------------------------------------------------------------------------

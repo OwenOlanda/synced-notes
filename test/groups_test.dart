@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:synced_notes/models/group_filter.dart';
 import 'package:synced_notes/models/note_group.dart';
 import 'package:synced_notes/models/note.dart';
 import 'package:synced_notes/services/note_storage.dart';
@@ -370,6 +371,92 @@ void main() {
       expect(
           NoteStorage.errorFor(NoteStorageException(NoteError.duplicateName)),
           NoteError.duplicateName);
+    });
+  });
+
+  group('notas fijadas (pins por vista)', () {
+    test('se fijan por vista y viven en .synced-notes/pins.json', () async {
+      await storage.createGroup('Recetas');
+      final tacos = await storage.saveNote(newNote(title: 'Tacos', group: 'Recetas'));
+      final suelta = await storage.saveNote(newNote(title: 'Suelta', second: 13));
+
+      await storage.setPinned(GroupFilter.all, suelta, true);
+      await storage.setPinned(const GroupFilter.group('Recetas'), tacos, true);
+      expect(await storage.listPins(), {
+        'all': {'2026-10-03_20-59-13'},
+        'g:Recetas': {'2026-10-03_20-59-12'},
+      });
+      final data = jsonDecode(File(
+              '${tempDir.path}$sep.synced-notes${sep}pins.json')
+          .readAsStringSync());
+      expect(data['version'], 1);
+      expect(data['views']['all'], ['2026-10-03_20-59-13']);
+
+      await storage.setPinned(GroupFilter.all, suelta, false);
+      expect(await storage.listPins(), {
+        'g:Recetas': {'2026-10-03_20-59-12'},
+      });
+    });
+
+    test('al renombrar el grupo, sus pins lo siguen', () async {
+      await storage.createGroup('Recetas');
+      final tacos = await storage.saveNote(newNote(title: 'Tacos', group: 'Recetas'));
+      await storage.setPinned(const GroupFilter.group('Recetas'), tacos, true);
+      await storage.renameGroup('Recetas', 'Cocina');
+      expect(await storage.listPins(), {
+        'g:Cocina': {'2026-10-03_20-59-12'},
+      });
+    });
+
+    test('al mover la nota pierde el pin de su grupo, no el de Todas',
+        () async {
+      await storage.createGroup('Recetas');
+      final tacos = await storage.saveNote(newNote(title: 'Tacos', group: 'Recetas'));
+      await storage.setPinned(const GroupFilter.group('Recetas'), tacos, true);
+      await storage.setPinned(GroupFilter.all, tacos, true);
+      await storage.moveNote(tacos, null);
+      expect(await storage.listPins(), {
+        'all': {'2026-10-03_20-59-12'},
+      });
+    });
+
+    test('al borrar la nota se desfija de todas las vistas', () async {
+      final nota = await storage.saveNote(newNote(title: 'Nota'));
+      await storage.setPinned(GroupFilter.all, nota, true);
+      await storage.setPinned(GroupFilter.none, nota, true);
+      await storage.deleteNote(nota.fileName!);
+      expect(await storage.listPins(), isEmpty);
+    });
+
+    test('al borrar un grupo se olvidan sus pins (y los de sus notas si se '
+        'borran)', () async {
+      await storage.createGroup('Recetas');
+      await storage.createGroup('Cartas');
+      final tacos = await storage.saveNote(newNote(title: 'Tacos', group: 'Recetas'));
+      final carta = await storage.saveNote(
+          newNote(title: 'Carta', group: 'Cartas', second: 13));
+      for (final (view, note) in [
+        (const GroupFilter.group('Recetas'), tacos),
+        (GroupFilter.all, tacos),
+        (const GroupFilter.group('Cartas'), carta),
+        (GroupFilter.all, carta),
+      ]) {
+        await storage.setPinned(view, note, true);
+      }
+
+      // Sus notas pasan a "Sin grupo": siguen fijadas en Todas.
+      await storage.deleteGroup('Cartas', deleteNotes: false);
+      // Sus notas se borran: se desfijan de todo.
+      await storage.deleteGroup('Recetas', deleteNotes: true);
+      expect(await storage.listPins(), {
+        'all': {'2026-10-03_20-59-13'},
+      });
+    });
+
+    test('borrar una nota sin pins no crea la carpeta oculta', () async {
+      final nota = await storage.saveNote(newNote(title: 'Nota'));
+      await storage.deleteNote(nota.fileName!);
+      expect(entries(), isEmpty);
     });
   });
 }

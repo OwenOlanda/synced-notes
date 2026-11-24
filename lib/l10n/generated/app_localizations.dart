@@ -997,6 +997,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to 100%'**
   String get textZoomReset;
+
+  /// Note menu: pin the note at the top of the current view (All, No group or a group).
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get pinNote;
+
+  /// Note menu: stop pinning the note in the current view.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get unpinNote;
+
+  /// Header above the pinned notes in the list (also the label of the pin icon).
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get pinnedNotes;
+
+  /// Header above the rest of the notes, below the pinned ones.
+  ///
+  /// In en, this message translates to:
+  /// **'Others'**
+  String get otherNotes;
 }
 
 class _AppLocalizationsDelegate

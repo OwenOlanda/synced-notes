@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
@@ -27,6 +29,7 @@ class NoteRow extends StatelessWidget {
     required this.onTap,
     required this.onMenu,
     this.selected = false,
+    this.pinned = false,
     this.search,
     this.matchesExpanded = false,
     this.matchesShown = 10,
@@ -47,6 +50,9 @@ class NoteRow extends StatelessWidget {
 
   /// La nota abierta en el editor (vista de PC): fondo resaltado.
   final bool selected;
+
+  /// Fijada en lo que se ve: alfiler junto a la fecha.
+  final bool pinned;
 
   /// Buscando: las coincidencias están desplegadas, y cuántas se ven.
   final bool matchesExpanded;
@@ -159,10 +165,33 @@ class NoteRow extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          shortDate(note.modifiedAt, l10n),
-                          style:
-                              theme.textTheme.bodySmall?.copyWith(color: muted),
+                        // Fecha (con el alfiler si está fijada): la fecha
+                        // se alinea por línea base con el título; el
+                        // alfiler, inclinado como 📌, se centra con la fecha.
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (pinned) ...[
+                              NoBaseline(
+                                child: Transform.rotate(
+                                  angle: math.pi / 4,
+                                  child: Icon(
+                                    Icons.push_pin,
+                                    key: const ValueKey('note-pin-icon'),
+                                    size: 17,
+                                    color: muted,
+                                    semanticLabel: l10n.pinnedNotes,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              shortDate(note.modifiedAt, l10n),
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: muted),
+                            ),
+                          ],
                         ),
                       ],
                     ),

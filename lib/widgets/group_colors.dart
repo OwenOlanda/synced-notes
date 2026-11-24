@@ -32,7 +32,7 @@ class GroupFolderIcon extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => _NoBaseline(
+  Widget build(BuildContext context) => NoBaseline(
         child: Icon(
           Icons.folder,
           size: size,
@@ -44,8 +44,11 @@ class GroupFolderIcon extends StatelessWidget {
 /// Oculta la línea base de su hijo. Un ícono es texto por dentro y tiene
 /// línea base; en una fila alineada por línea base (o centrada junto a un
 /// texto) eso lo subía. Sin línea base, la carpetita se centra con el texto.
-class _NoBaseline extends SingleChildRenderObjectWidget {
-  const _NoBaseline({super.child});
+/// Envuelve un ícono para que no tenga línea base: así, dentro de una fila
+/// alineada por línea base, se centra en vertical con el texto en lugar de
+/// quedar un poco más arriba.
+class NoBaseline extends SingleChildRenderObjectWidget {
+  const NoBaseline({super.key, super.child});
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
