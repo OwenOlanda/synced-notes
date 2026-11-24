@@ -611,4 +611,88 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openLinkError => 'Couldn\'t open the link';
+
+  @override
+  String get lineNumbersTitle => 'Line numbers';
+
+  @override
+  String get lineNumbersDescription =>
+      'Shows the number of each line in the margin, to the left of the text';
+
+  @override
+  String selectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected',
+      one: '1 selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cancelSelection => 'Cancel selection';
+
+  @override
+  String get selectAll => 'Select all';
+
+  @override
+  String get pinSelected => 'Pin';
+
+  @override
+  String get unpinSelected => 'Unpin';
+
+  @override
+  String get moveSelected => 'Move to…';
+
+  @override
+  String get deleteSelected => 'Delete';
+
+  @override
+  String deleteNotesQuestion(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete $count notes?',
+      one: 'Delete 1 note?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteNotesWarning =>
+      'They\'ll be deleted from the notes folder. This can\'t be undone.';
+
+  @override
+  String notesDeleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notes deleted',
+      one: '1 note deleted',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String notesMovedTo(int count, String name) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notes moved to \"$name\"',
+      one: '1 note moved to \"$name\"',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String notesMovedToNone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notes moved to \"No group\"',
+      one: '1 note moved to \"No group\"',
+    );
+    return '$_temp0';
+  }
 }

@@ -8,6 +8,7 @@ import 'package:synced_notes/models/note.dart';
 import 'package:synced_notes/screens/note_editor_screen.dart';
 import 'package:synced_notes/services/app_settings.dart';
 import 'package:synced_notes/widgets/find_highlight_controller.dart';
+import 'package:synced_notes/widgets/line_numbers_painter.dart';
 
 import 'helpers/fake_storage.dart';
 import 'helpers/localized_app.dart';
@@ -338,6 +339,41 @@ void main() {
       expect(find.byTooltip('Deshacer (Ctrl+Z)'), findsOneWidget);
       expect(find.byTooltip('Rehacer (Ctrl+Y)'), findsOneWidget);
       expect(find.byKey(const ValueKey('keyboard-bar')), findsNothing);
+    });
+
+    testWidgets('números de línea: en el margen, sin estorbar los toques',
+        (tester) async {
+      await showNote(tester);
+      expect(
+          find.byWidgetPredicate(
+              (w) => w is CustomPaint && w.painter is LineNumbersPainter),
+          findsNothing);
+
+      await settings.setLineNumbers(true);
+      await showNote(tester);
+      final painter = find.byWidgetPredicate(
+          (w) => w is CustomPaint && w.painter is LineNumbersPainter);
+      expect(painter, findsOneWidget);
+      // No recibe toques: va dentro de un IgnorePointer.
+      expect(
+          find.ancestor(of: painter, matching: find.byType(IgnorePointer)),
+          findsWidgets);
+
+      // Tocar el margen (donde van los números) sigue poniendo el cursor
+      // al principio del renglón, y el texto no perdió ancho.
+      final editable =
+          tester.state<EditableTextState>(find.byType(EditableText).last)
+              .renderEditable;
+      final field = tester.getRect(contentField());
+      final start = editable.localToGlobal(
+          editable.getLocalRectForCaret(const TextPosition(offset: 0))
+              .centerLeft);
+      expect(start.dx - field.left, greaterThanOrEqualTo(16));
+      await tester.tap(contentField());
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tapAt(Offset(field.left + 4, start.dy));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(content(tester).selection.baseOffset, 0);
     });
 
     testWidgets('tocar el margen a un lado del renglón pone el cursor en su orilla',

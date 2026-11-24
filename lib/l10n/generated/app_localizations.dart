@@ -1123,6 +1123,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t open the link'**
   String get openLinkError;
+
+  /// Settings → Writing: switch that shows line numbers next to the text of notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Line numbers'**
+  String get lineNumbersTitle;
+
+  /// Settings → Writing: explanation of the line numbers switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Shows the number of each line in the margin, to the left of the text'**
+  String get lineNumbersDescription;
+
+  /// Top bar while selecting notes: how many are selected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 selected} other{{count} selected}}'**
+  String selectedCount(int count);
+
+  /// Tooltip of the ✕ that leaves selection mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel selection'**
+  String get cancelSelection;
+
+  /// Selection mode: select every note in the current view.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get selectAll;
+
+  /// Selection mode: pin the selected notes in the current view.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get pinSelected;
+
+  /// Selection mode: unpin the selected notes (when all are pinned).
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get unpinSelected;
+
+  /// Selection mode: move the selected notes to a group.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to…'**
+  String get moveSelected;
+
+  /// Selection mode: delete the selected notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get deleteSelected;
+
+  /// Title of the dialog that confirms deleting several notes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Delete 1 note?} other{Delete {count} notes?}}'**
+  String deleteNotesQuestion(int count);
+
+  /// Body of the dialog that confirms deleting several notes.
+  ///
+  /// In en, this message translates to:
+  /// **'They\'ll be deleted from the notes folder. This can\'t be undone.'**
+  String get deleteNotesWarning;
+
+  /// Message after deleting several notes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 note deleted} other{{count} notes deleted}}'**
+  String notesDeleted(int count);
+
+  /// Message after moving several notes to a group.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 note moved to \"{name}\"} other{{count} notes moved to \"{name}\"}}'**
+  String notesMovedTo(int count, String name);
+
+  /// Message after moving several notes out of their groups.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 note moved to \"No group\"} other{{count} notes moved to \"No group\"}}'**
+  String notesMovedToNone(int count);
 }
 
 class _AppLocalizationsDelegate

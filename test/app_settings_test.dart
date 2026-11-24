@@ -142,4 +142,11 @@ void main() {
       'b': DateTime(2026, 11, 23, 11).millisecondsSinceEpoch,
     });
   });
+
+  test('números de línea: apagados por defecto y se recuerdan', () async {
+    final settings = await AppSettings.load();
+    expect(settings.lineNumbers, isFalse);
+    await settings.setLineNumbers(true);
+    expect((await AppSettings.load()).lineNumbers, isTrue);
+  });
 }

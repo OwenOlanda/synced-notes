@@ -306,6 +306,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             listenable: widget.settings,
             builder: (context, _) => _buildTextZoom(context),
           ),
+          ListenableBuilder(
+            listenable: widget.settings,
+            builder: (context, _) => SwitchListTile(
+              key: const ValueKey('line-numbers-switch'),
+              secondary: const Icon(Icons.format_list_numbered),
+              title: Text(l10n.lineNumbersTitle),
+              subtitle: Text(l10n.lineNumbersDescription),
+              value: widget.settings.lineNumbers,
+              onChanged: widget.settings.setLineNumbers,
+            ),
+          ),
           const Divider(),
           _SectionHeader(l10n.settingsSectionNotesLocation),
           ListTile(

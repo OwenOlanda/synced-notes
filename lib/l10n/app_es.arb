@@ -170,5 +170,19 @@
   "openLink": "Abrir {target}",
   "openLinkCtrlHint": "Ctrl + clic",
   "openLinkMenu": "Abrir enlace",
-  "openLinkError": "No se pudo abrir el enlace"
+  "openLinkError": "No se pudo abrir el enlace",
+  "lineNumbersTitle": "Números de línea",
+  "lineNumbersDescription": "Muestra el número de cada renglón en el margen, a la izquierda del texto",
+  "selectedCount": "{count, plural, =1{1 seleccionada} other{{count} seleccionadas}}",
+  "cancelSelection": "Cancelar selección",
+  "selectAll": "Seleccionar todas",
+  "pinSelected": "Fijar",
+  "unpinSelected": "Desfijar",
+  "moveSelected": "Mover a…",
+  "deleteSelected": "Borrar",
+  "deleteNotesQuestion": "{count, plural, =1{¿Borrar 1 nota?} other{¿Borrar {count} notas?}}",
+  "deleteNotesWarning": "Se borrarán de la carpeta de notas. Esto no se puede deshacer.",
+  "notesDeleted": "{count, plural, =1{1 nota borrada} other{{count} notas borradas}}",
+  "notesMovedTo": "{count, plural, =1{1 nota movida a \"{name}\"} other{{count} notas movidas a \"{name}\"}}",
+  "notesMovedToNone": "{count, plural, =1{1 nota movida a \"Sin grupo\"} other{{count} notas movidas a \"Sin grupo\"}}"
 }

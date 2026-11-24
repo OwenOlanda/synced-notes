@@ -612,4 +612,88 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get openLinkError => 'No se pudo abrir el enlace';
+
+  @override
+  String get lineNumbersTitle => 'Números de línea';
+
+  @override
+  String get lineNumbersDescription =>
+      'Muestra el número de cada renglón en el margen, a la izquierda del texto';
+
+  @override
+  String selectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count seleccionadas',
+      one: '1 seleccionada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cancelSelection => 'Cancelar selección';
+
+  @override
+  String get selectAll => 'Seleccionar todas';
+
+  @override
+  String get pinSelected => 'Fijar';
+
+  @override
+  String get unpinSelected => 'Desfijar';
+
+  @override
+  String get moveSelected => 'Mover a…';
+
+  @override
+  String get deleteSelected => 'Borrar';
+
+  @override
+  String deleteNotesQuestion(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '¿Borrar $count notas?',
+      one: '¿Borrar 1 nota?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteNotesWarning =>
+      'Se borrarán de la carpeta de notas. Esto no se puede deshacer.';
+
+  @override
+  String notesDeleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notas borradas',
+      one: '1 nota borrada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String notesMovedTo(int count, String name) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notas movidas a \"$name\"',
+      one: '1 nota movida a \"$name\"',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String notesMovedToNone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notas movidas a \"Sin grupo\"',
+      one: '1 nota movida a \"Sin grupo\"',
+    );
+    return '$_temp0';
+  }
 }

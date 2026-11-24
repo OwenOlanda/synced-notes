@@ -34,6 +34,7 @@ class AppSettings extends ChangeNotifier {
   static const String _searchWholeWordKey = 'search_whole_word';
   static const String _textZoomKey = 'text_zoom';
   static const String _noteOrderKey = 'note_order';
+  static const String _lineNumbersKey = 'line_numbers';
   static const String _openedKey = 'note_opened';
 
   static Future<AppSettings> load() async =>
@@ -149,6 +150,15 @@ class AppSettings extends ChangeNotifier {
   /// Dentro de los límites y en el paso de 10 % más cercano (1.234 → 1.2).
   static double snapTextZoom(double zoom) =>
       (clampTextZoom(zoom) * 10).round() / 10;
+
+  /// Números de línea a la izquierda del texto de las notas (en el margen,
+  /// sin quitarle ancho al texto). Apagados por defecto.
+  bool get lineNumbers => _prefs.getBool(_lineNumbersKey) ?? false;
+
+  Future<void> setLineNumbers(bool enabled) async {
+    await _prefs.setBool(_lineNumbersKey, enabled);
+    notifyListeners();
+  }
 
   /// Orden de la lista de notas (el mismo en todas las vistas). Por
   /// defecto: editadas recientemente.

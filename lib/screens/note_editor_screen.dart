@@ -21,6 +21,7 @@ import '../widgets/app_message.dart';
 import '../widgets/blocked_chars_formatter.dart';
 import '../widgets/confirm_delete_dialog.dart';
 import '../widgets/find_highlight_controller.dart';
+import '../widgets/line_numbers_painter.dart';
 import '../widgets/search_options_toggles.dart';
 import '../widgets/move_note_dialog.dart';
 
@@ -1535,7 +1536,10 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
             // Barra a la derecha (como VS Code / Sublime): dice en qué parte
             // de la nota vas y cuánto falta; se puede arrastrar.
             // El margen de la orilla va en el tema: Scrollbar no lo recibe.
-            child: ScrollbarTheme(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+            ScrollbarTheme(
               data: ScrollbarTheme.of(context).copyWith(crossAxisMargin: 3),
               child: Scrollbar(
               key: const ValueKey('content-scrollbar'),
@@ -1601,11 +1605,36 @@ class NoteEditorScreenState extends State<NoteEditorScreen>
               ),
             ),
             ),
+            // Números de línea (Ajustes): dibujados encima del margen
+            // izquierdo, sin quitarle ancho al texto. No reciben toques:
+            // tocar el margen sigue poniendo el cursor al principio del
+            // renglón.
+            if (widget.settings.lineNumbers)
+              IgnorePointer(
+                child: CustomPaint(
+                  key: _lineNumbersKey,
+                  painter: LineNumbersPainter(
+                    controller: _content,
+                    editable: () => _contentEditable()?.renderEditable,
+                    self: () => _lineNumbersKey.currentContext
+                        ?.findRenderObject() as RenderBox?,
+                    zoom: _zoom,
+                    color: colors.onSurfaceVariant.withValues(alpha: 0.55),
+                    currentColor: colors.onSurfaceVariant,
+                    repaint: Listenable.merge([_content, _contentScroll]),
+                  ),
+                ),
+              ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
+
+  /// Para que los números de línea sepan dónde se dibujan.
+  final GlobalKey _lineNumbersKey = GlobalKey();
 
   /// Los campos con el botón redondo ↑/↓ encima, abajo a la derecha. Se ve
   /// mientras se desplaza la nota (y unos segundos después); la flecha

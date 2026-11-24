@@ -90,6 +90,18 @@ void main() {
     expect(tester.widget<Text>(value).data, '100%');
   });
 
+  testWidgets('números de línea: el interruptor los prende y apaga',
+      (tester) async {
+    await showSettings(tester, isWindows: false);
+    final tile = find.byKey(const ValueKey('line-numbers-switch'));
+    await tester.scrollUntilVisible(tile, 100,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Números de línea'), findsOneWidget);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(settings.lineNumbers, isTrue);
+  });
+
   testWidgets('el botón "Abrir en el explorador" solo aparece en Windows',
       (tester) async {
     await showSettings(tester, isWindows: true);
