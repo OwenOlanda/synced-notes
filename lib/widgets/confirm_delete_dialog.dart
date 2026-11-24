@@ -30,3 +30,31 @@ Future<bool> confirmDeleteNote(BuildContext context, String displayTitle) async 
   );
   return result ?? false;
 }
+
+/// Pregunta antes de borrar varias notas (selección). `true` = confirmó.
+Future<bool> confirmDeleteNotes(BuildContext context, int count) async {
+  final colors = Theme.of(context).colorScheme;
+  final l10n = context.l10n;
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.deleteNotesQuestion(count)),
+      content: Text(l10n.deleteNotesWarning),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: colors.error,
+            foregroundColor: colors.onError,
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l10n.delete),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}

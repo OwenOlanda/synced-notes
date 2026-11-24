@@ -28,8 +28,11 @@ class NoteRow extends StatelessWidget {
     required this.showGroup,
     required this.onTap,
     required this.onMenu,
+    this.onLongPress,
     this.selected = false,
     this.pinned = false,
+    this.selectionMode = false,
+    this.checked = false,
     this.search,
     this.matchesExpanded = false,
     this.matchesShown = 10,
@@ -48,11 +51,19 @@ class NoteRow extends StatelessWidget {
   /// Menú de la nota (mantener presionado o clic derecho), en esa posición.
   final void Function(Offset position) onMenu;
 
+  /// Mantener presionada (si no se da, abre [onMenu]).
+  final void Function(Offset position)? onLongPress;
+
   /// La nota abierta en el editor (vista de PC): fondo resaltado.
   final bool selected;
 
   /// Fijada en lo que se ve: alfiler junto a la fecha.
   final bool pinned;
+
+  /// Seleccionando notas (mantener presionado): cada fila lleva un círculo
+  /// a la izquierda, marcado si [checked].
+  final bool selectionMode;
+  final bool checked;
 
   /// Buscando: las coincidencias están desplegadas, y cuántas se ven.
   final bool matchesExpanded;
@@ -118,18 +129,44 @@ class NoteRow extends StatelessWidget {
     final showGroupHere = showGroup && group != null && groupColor != null;
     return GestureDetector(
       onSecondaryTapUp: (details) => onMenu(details.globalPosition),
-      onLongPressStart: (details) => onMenu(details.globalPosition),
+      onLongPressStart: (details) =>
+          (onLongPress ?? onMenu)(details.globalPosition),
       child: Material(
-        type: selected ? MaterialType.canvas : MaterialType.transparency,
-        color: selected ? theme.colorScheme.surfaceContainerHighest : null,
+        type: selected || checked
+            ? MaterialType.canvas
+            : MaterialType.transparency,
+        color: checked
+            ? theme.colorScheme.secondaryContainer
+            : selected
+                ? theme.colorScheme.surfaceContainerHighest
+                : null,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           child: Stack(
             children: [
+              // Seleccionando: círculo (marcado o no) a la izquierda.
+              if (selectionMode)
+                PositionedDirectional(
+                  start: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Icon(
+                      checked
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      key: ValueKey(checked ? 'note-checked' : 'note-unchecked'),
+                      size: 22,
+                      color: checked
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
               // Barrita del color del grupo (2 px).
-              if (showGroupHere)
+              if (showGroupHere && !selectionMode)
                 PositionedDirectional(
                   start: 8,
                   top: 12,
@@ -143,8 +180,10 @@ class NoteRow extends StatelessWidget {
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(22, 12, 12, 12),
+              AnimatedPadding(
+                duration: const Duration(milliseconds: 150),
+                padding: EdgeInsetsDirectional.fromSTEB(
+                    selectionMode ? 46 : 22, 12, 12, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

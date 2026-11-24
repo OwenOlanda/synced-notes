@@ -1,4 +1,4 @@
-import 'package:flutter/gestures.dart' show PointerDeviceKind, kSecondaryButton;
+import 'package:flutter/gestures.dart' show PointerDeviceKind, kSecondaryButton, kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -125,7 +125,7 @@ void main() {
 
     await tester.longPress(find.text('Untitled'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
+    await tester.tap(find.byTooltip('Delete'));
     await tester.pumpAndSettle();
 
     expect(find.text('Delete note?'), findsOneWidget);
@@ -524,7 +524,7 @@ void main() {
 
       await tester.longPress(find.text('Suelta'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Mover a…'));
+      await tester.tap(find.byTooltip('Mover a…'));
       await tester.pumpAndSettle();
 
       // En el diálogo, "Sin grupo" es la actual (marcada).
@@ -546,7 +546,7 @@ void main() {
 
       await tester.longPress(find.text('Suelta'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Mover a…'));
+      await tester.tap(find.byTooltip('Mover a…'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Nuevo grupo…'));
       await tester.pumpAndSettle();
@@ -1306,7 +1306,7 @@ void main() {
         {String action = 'Fijar'}) async {
       await tester.longPress(find.text(title));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(action));
+      await tester.tap(find.byTooltip(action));
       await tester.pumpAndSettle();
     }
 
@@ -1610,6 +1610,261 @@ void main() {
       await choose(tester, 'Recetas');
       expect(find.byKey(const ValueKey('group-section-Recetas')),
           findsNothing);
+    });
+  });
+
+  group('selección de varias notas', () {
+    Note dated(String title, int second, {String? group}) {
+      final date = DateTime(2026, 10, 3, 20, 59, second);
+      return Note(
+        fileName: NoteStorage.fileNameFor(title, date),
+        group: group,
+        title: title,
+        content: 'texto',
+        createdAt: date,
+        modifiedAt: date,
+      );
+    }
+
+    final notes = [
+      dated('Primera', 3),
+      dated('Segunda', 2),
+      dated('Tercera', 1),
+    ];
+    const groups = [NoteGroup(name: 'Recetas', color: GroupColor.orange)];
+    final bar = find.byKey(const ValueKey('selection-bar'));
+    final checked = find.byKey(const ValueKey('note-checked'));
+
+    testWidgets('mantener presionada una nota la selecciona; tocar otras '
+        'las agrega o quita', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      expect(bar, findsNothing);
+
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      expect(bar, findsOneWidget);
+      expect(find.text('1 seleccionada'), findsOneWidget);
+      expect(checked, findsOneWidget);
+      // Arriba: Fijar, Mover y Borrar (en lugar de buscar/recargar/ajustes).
+      expect(find.byTooltip('Fijar'), findsOneWidget);
+      expect(find.byTooltip('Mover a…'), findsOneWidget);
+      expect(find.byTooltip('Borrar'), findsOneWidget);
+      expect(find.byTooltip('Buscar notas'), findsNothing);
+      // Sin panel ni "Nueva nota" mientras se selecciona.
+      expect(find.byType(GroupPanel), findsNothing);
+
+      await tester.tap(find.text('Segunda'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 seleccionadas'), findsOneWidget);
+      await tester.tap(find.text('Primera'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 seleccionada'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Seleccionar todas'));
+      await tester.pumpAndSettle();
+      expect(find.text('3 seleccionadas'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Cancelar selección'));
+      await tester.pumpAndSettle();
+      expect(bar, findsNothing);
+      expect(find.byType(GroupPanel), findsOneWidget);
+    });
+
+    testWidgets('al seleccionar, el encabezado no cambia de altura',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      final appBar = find.byType(AppBar);
+      final height = tester.getSize(appBar).height;
+      final y = tester.getTopLeft(find.text('Segunda')).dy;
+
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(appBar).height, height);
+      expect(tester.getTopLeft(find.text('Segunda')).dy, y);
+      // Sin el resumen ni el orden mientras se selecciona.
+      expect(find.byKey(const ValueKey('note-order-button')), findsNothing);
+    });
+
+    testWidgets('sin soltar, deslizar el dedo marca las notas por donde pasa',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      final gesture =
+          await tester.startGesture(tester.getCenter(find.text('Primera')));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      expect(find.text('1 seleccionada'), findsOneWidget);
+
+      final to = tester.getCenter(find.text('Tercera'));
+      final from = tester.getCenter(find.text('Primera'));
+      for (var i = 1; i <= 8; i++) {
+        await gesture.moveTo(Offset.lerp(from, to, i / 8)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(find.text('3 seleccionadas'), findsOneWidget);
+
+      // De regreso (sin soltar), las que ya no están en el rango se quitan.
+      await gesture.moveTo(tester.getCenter(find.text('Segunda')));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.text('2 seleccionadas'), findsOneWidget);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.text('2 seleccionadas'), findsOneWidget);
+    });
+
+    testWidgets('mantener presionada una marcada y deslizar desmarca',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Seleccionar todas'));
+      await tester.pumpAndSettle();
+      expect(find.text('3 seleccionadas'), findsOneWidget);
+
+      final gesture =
+          await tester.startGesture(tester.getCenter(find.text('Primera')));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      expect(find.text('2 seleccionadas'), findsOneWidget);
+      final from = tester.getCenter(find.text('Primera'));
+      final to = tester.getCenter(find.text('Segunda'));
+      for (var i = 1; i <= 6; i++) {
+        await gesture.moveTo(Offset.lerp(from, to, i / 6)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(find.text('1 seleccionada'), findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.text('1 seleccionada'), findsOneWidget);
+    });
+
+    testWidgets('si se desmarcan todas arrastrando, al soltar se sale de la '
+        'selección', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      // Mantener presionada la única marcada: se desmarca, pero sigue la
+      // selección hasta soltar.
+      final gesture =
+          await tester.startGesture(tester.getCenter(find.text('Primera')));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      expect(bar, findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(bar, findsNothing);
+    });
+
+    testWidgets('seleccionando, mantener presionada otra marca el rango '
+        'desde la última marcada', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Tercera'));
+      await tester.pumpAndSettle();
+      expect(find.text('3 seleccionadas'), findsOneWidget);
+    });
+
+    testWidgets('"atrás" cancela la selección (sin salir)', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(bar, findsNothing);
+      expect(find.text('Primera'), findsOneWidget);
+    });
+
+    testWidgets('mover varias a la vez', (tester) async {
+      final storage = await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tercera'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Mover a…'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(
+          of: find.byType(SimpleDialog), matching: find.text('Recetas')));
+      await tester.pumpAndSettle();
+
+      expect(storage.notes.where((n) => n.group == 'Recetas').map((n) => n.title),
+          unorderedEquals(['Primera', 'Tercera']));
+      expect(find.text('2 notas movidas a "Recetas"'), findsOneWidget);
+      expect(bar, findsNothing);
+    });
+
+    testWidgets('borrar varias a la vez (pregunta antes)', (tester) async {
+      final storage = await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Primera'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Segunda'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Borrar'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Borrar 2 notas?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Borrar'));
+      await tester.pumpAndSettle();
+
+      expect(storage.notes.map((n) => n.title), ['Tercera']);
+      expect(find.text('2 notas borradas'), findsOneWidget);
+    });
+
+    testWidgets('fijar varias a la vez', (tester) async {
+      final storage = await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Segunda'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tercera'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Fijar'));
+      await tester.pumpAndSettle();
+      expect(storage.pins['all'],
+          {'2026-10-03_20-59-02', '2026-10-03_20-59-01'});
+      expect(find.byKey(const ValueKey('note-pin-icon')), findsNWidgets(2));
+    });
+  });
+
+  group('deslizar la lista para cambiar de grupo', () {
+    final notes = [
+      _note(title: 'Suelta', content: 'a'),
+      _note(title: 'Pastel', content: 'b', group: 'Recetas'),
+    ];
+    const groups = [NoteGroup(name: 'Recetas', color: GroupColor.orange)];
+
+    Future<void> swipe(WidgetTester tester, double dx) async {
+      await tester.fling(find.byType(NoteRow).first, Offset(dx, 0), 1000);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('hacia la izquierda va al siguiente chip; a la derecha, al '
+        'anterior', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      expect(settings.selectedGroup, GroupFilter.all);
+
+      await swipe(tester, -300);
+      expect(settings.selectedGroup, GroupFilter.none);
+      await swipe(tester, -300);
+      expect(settings.selectedGroup, const GroupFilter.group('Recetas'));
+      // En la última vista ya no hay a dónde ir.
+      await swipe(tester, -300);
+      expect(settings.selectedGroup, const GroupFilter.group('Recetas'));
+
+      await swipe(tester, 300);
+      expect(settings.selectedGroup, GroupFilter.none);
+    });
+
+    testWidgets('tocar un chip desliza la lista hasta ese grupo',
+        (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.tap(chipOf('Recetas'));
+      await tester.pumpAndSettle();
+      expect(settings.selectedGroup, const GroupFilter.group('Recetas'));
+      expect(find.text('Pastel'), findsOneWidget);
+      expect(find.text('Suelta'), findsNothing);
+    });
+
+    testWidgets('seleccionando no cambia de grupo', (tester) async {
+      await showList(tester, notes: notes, groups: groups);
+      await tester.longPress(find.text('Suelta'));
+      await tester.pumpAndSettle();
+      await swipe(tester, -300);
+      expect(settings.selectedGroup, GroupFilter.all);
     });
   });
 }

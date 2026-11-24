@@ -19,6 +19,7 @@ Future<({String? group})?> pickGroupForMove(
   BuildContext context, {
   required NoteStorage storage,
   required String? current,
+  bool hasCurrent = true,
 }) async {
   final l10n = context.l10n;
   final List<NoteGroup> groups;
@@ -60,7 +61,7 @@ Future<({String? group})?> pickGroupForMove(
             value: none,
             label: l10n.groupsNone,
             leading: const Icon(Icons.inbox_outlined),
-            isCurrent: current == null,
+            isCurrent: hasCurrent && current == null,
           ),
           for (final group in groups)
             option(
@@ -70,7 +71,7 @@ Future<({String? group})?> pickGroupForMove(
                 width: 24,
                 child: Center(child: GroupDot(group.color, size: 14)),
               ),
-              isCurrent: current == group.name,
+              isCurrent: hasCurrent && current == group.name,
             ),
           const Divider(),
           option(

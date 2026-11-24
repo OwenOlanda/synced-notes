@@ -1,4 +1,9 @@
+import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart' show HitTestResult;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderMetaData;
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../l10n/l10n.dart';
@@ -73,7 +78,8 @@ class _GroupSection {
   final int count;
 }
 
-class _NotesListScreenState extends State<NotesListScreen> {
+class _NotesListScreenState extends State<NotesListScreen>
+    with SingleTickerProviderStateMixin {
   List<Note>? _notes; // null = cargando
   List<NoteGroup> _groups = const [];
 
@@ -82,8 +88,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
   Map<String, Set<String>> _pins = const {};
 
   /// ¿Está fijada [note] en lo que se ve?
-  bool _isPinned(Note note) =>
-      _pins[_scope.encode()]?.contains(NoteStorage.noteId(note)) ?? false;
+  bool _isPinned(Note note) => _isPinnedIn(note, _scope);
+  bool _isPinnedIn(Note note, GroupFilter view) =>
+      _pins[view.encode()]?.contains(NoteStorage.noteId(note)) ?? false;
   Object? _loadError; // el texto se arma en build(), en el idioma actual
 
   /// Vista de PC: la nota abierta en la columna del editor (`null` =
@@ -175,11 +182,19 @@ class _NotesListScreenState extends State<NotesListScreen> {
     _shortcutsFocus.dispose();
     _searchText.dispose();
     _searchFocus.dispose();
+    _dragTicker?.dispose();
+    _pages?.dispose();
+    for (final c in _listControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   void _openSearch() {
-    setState(() => _searchOpen = true);
+    setState(() {
+      _searchOpen = true;
+      _selection = {};
+    });
     _searchFocus.requestFocus();
   }
 
@@ -197,13 +212,18 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// que coinciden (primero las que coinciden en el título). Con el
   /// buscador vacío se ven todas las de ese lugar: así, al cambiar a "Buscar
   /// en todas", la lista cambia de inmediato.
-  List<Note> _visibleNotes() {
+  ///
+  /// [view]: otra vista (las páginas de al lado, al deslizar).
+  List<Note> _visibleNotes([GroupFilter? view]) {
     final all = _notes ?? const <Note>[];
     final search = _search;
+    final scope = view ?? _scope;
+    final order = _effectiveOrderFor(scope);
+    bool isPinned(Note n) => _isPinnedIn(n, scope);
     final scoped = sortNotes(
-      all.where(_scope.matches),
-      _effectiveOrder,
-      opened: _effectiveOrder == NoteOrder.opened
+      all.where(scope.matches),
+      order,
+      opened: order == NoteOrder.opened
           ? widget.settings.noteOpenedTimes()
           : const {},
       groupOrder: [for (final g in _groups) g.name],
@@ -212,8 +232,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
     // cuentan (primero las que coinciden en el título).
     if (search.isEmpty) {
       return [
-        ...scoped.where(_isPinned),
-        ...scoped.where((n) => !_isPinned(n)),
+        ...scoped.where(isPinned),
+        ...scoped.where((n) => !isPinned(n)),
       ];
     }
     final found = scoped.where(search.matches).toList();
@@ -225,9 +245,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   /// El orden que se usa aquí: "Por grupo" solo tiene sentido en "Todas"
   /// y sin buscar; en lo demás se ordena por editadas recientemente.
-  NoteOrder get _effectiveOrder {
+  NoteOrder _effectiveOrderFor(GroupFilter scope) {
     final order = widget.settings.noteOrder;
-    if (order == NoteOrder.byGroup && (!_scope.isAll || !_search.isEmpty)) {
+    if (order == NoteOrder.byGroup && (!scope.isAll || !_search.isEmpty)) {
       return NoteOrder.edited;
     }
     return order;
@@ -550,10 +570,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
       final groups = await widget.storage.listGroups();
       final pins = await widget.storage.listPins();
       if (!mounted) return;
+      final ids = {for (final n in notes) _selectionKey(n)};
       setState(() {
         _notes = notes;
         _groups = groups;
         _pins = pins;
+        _selection = _selection.where(ids.contains).toSet();
         _loadError = null;
       });
       // El grupo que se estaba viendo ya no existe (ej. se borró desde
@@ -581,9 +603,78 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
   }
 
-  Future<void> _select(GroupFilter filter) async {
+  // Deslizar la lista para cambiar de grupo ------------------------------
+  //
+  // Las vistas están una junto a otra, como fotos en una galería: la lista
+  // sigue al dedo y se ve la de al lado entrando.
+
+  /// Las páginas (una por vista, en el orden de los chips). Se crea al
+  /// mostrar la lista por primera vez.
+  PageController? _pages;
+
+  /// Mientras la lista va sola a la página de un chip que se tocó: las
+  /// páginas que pasa en medio no cambian la vista.
+  int? _pageTarget;
+
+  /// Las vistas en el orden de los chips: Todas, Sin grupo (si hay
+  /// grupos) y cada grupo.
+  List<GroupFilter> get _viewsInOrder => [
+        GroupFilter.all,
+        if (_groups.isNotEmpty) GroupFilter.none,
+        for (final g in _groups) GroupFilter.group(g.name),
+      ];
+
+  /// Se deslizó a otra página (al pasar la mitad): esa es la vista.
+  void _onPageChanged(int index) {
+    if (_pageTarget != null) return;
+    final views = _viewsInOrder;
+    if (index < views.length && views[index] != _filter) {
+      _select(views[index], movePage: false);
+    }
+  }
+
+  /// Si las páginas no están en la vista elegida (ej. se agregó o borró un
+  /// grupo antes), se acomodan sin animación.
+  void _syncPage() {
+    final pages = _pages;
+    if (pages == null || !pages.hasClients || _pageTarget != null) return;
+    final position = pages.position;
+    if (position.isScrollingNotifier.value) return;
+    final want = _viewsInOrder.indexOf(_filter);
+    final page = pages.page;
+    if (want < 0 || page == null || page.round() == want) return;
+    pages.jumpToPage(want);
+  }
+
+  /// Lleva las páginas a la vista [index] (se tocó un chip): se desliza
+  /// como si se hubiera arrastrado.
+  void _animateToPage(int index) {
+    final pages = _pages;
+    if (pages == null || !pages.hasClients) return;
+    final page = pages.page;
+    if (page == null || page.round() == index) return;
+    _pageTarget = index;
+    pages
+        .animateToPage(index,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic)
+        .whenComplete(() {
+      if (_pageTarget == index) _pageTarget = null;
+    });
+  }
+
+  /// Cambia la vista. [movePage]: también desliza las páginas hasta ella
+  /// (no hace falta si se llegó deslizando).
+  Future<void> _select(GroupFilter filter, {bool movePage = true}) async {
+    _selection = {};
+    _lastChecked = null;
     _searchScope = null; // la búsqueda vuelve a ser "en lo que se ve"
-    await widget.settings.setSelectedGroup(filter);
+    final done = widget.settings.setSelectedGroup(filter);
+    if (movePage) {
+      final index = _viewsInOrder.indexOf(filter);
+      if (index >= 0) _animateToPage(index);
+    }
+    await done;
     if (mounted) setState(() {});
   }
 
@@ -698,42 +789,331 @@ class _NotesListScreenState extends State<NotesListScreen> {
     ));
   }
 
-  /// Menú en la posición del clic (o del dedo).
-  Future<String?> _menuAt(Offset position, List<PopupMenuEntry<String>> items) {
-    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
-    return showMenu<String>(
-      context: context,
-      position: RelativeRect.fromRect(
-        position & const Size(1, 1),
-        Offset.zero & overlay.size,
-      ),
-      items: items,
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Notas
   // ---------------------------------------------------------------------------
 
-  Future<void> _showNoteMenu(Note note, Offset position) async {
-    final l10n = context.l10n;
-    final pinned = _isPinned(note);
-    final choice = await _menuAt(position, [
-      PopupMenuItem(
-        value: 'pin',
-        child: Text(pinned ? l10n.unpinNote : l10n.pinNote),
-      ),
-      PopupMenuItem(value: 'move', child: Text(l10n.moveTo)),
-      PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
-    ]);
-    switch (choice) {
-      case 'pin':
-        await _setPinned(note, !pinned);
-      case 'move':
-        await _move(note);
-      case 'delete':
-        await _delete(note);
+  // Selección de varias notas (mantener presionada una nota) ---------------
+
+  /// Notas seleccionadas (ver [_selectionKey]). Vacío = no se está
+  /// seleccionando.
+  Set<String> _selection = {};
+  /// (Mientras se arrastra desmarcando se sigue seleccionando aunque ya no
+  /// quede ninguna marcada; al soltar, si no queda ninguna, se sale.)
+  bool get _selecting => _selection.isNotEmpty || _dragView != null;
+
+  bool _isChecked(Note note) => _selection.contains(_selectionKey(note));
+
+  /// Grupo + archivo: identifica la nota aunque dos tengan la misma fecha
+  /// de creación.
+  static String _selectionKey(Note note) =>
+      '${note.group ?? ''}/${note.fileName}';
+
+  /// Las notas seleccionadas que se ven (en el orden de la lista).
+  List<Note> get _selectedNotes =>
+      [for (final n in _visibleNotes()) if (_isChecked(n)) n];
+
+  /// Mantener presionada una nota (o clic derecho / Ctrl+clic en PC): se
+  /// selecciona o deja de estarlo. Arriba aparecen Fijar, Mover y Borrar.
+  void _toggleSelection(Note note) {
+    final id = _selectionKey(note);
+    setState(() {
+      _selection = {..._selection};
+      if (_selection.remove(id)) {
+        if (_lastChecked == id) _lastChecked = null;
+      } else {
+        _selection.add(id);
+        _lastChecked = id;
+      }
+    });
+  }
+
+  void _clearSelection() {
+    _lastChecked = null;
+    if (_selecting) setState(() => _selection = {});
+  }
+
+  /// La última nota que se marcó: desde ahí se marca un rango al mantener
+  /// presionada otra.
+  String? _lastChecked;
+
+  // Arrastrar para seleccionar: después de mantener presionada una nota,
+  // sin soltar, deslizar el dedo marca todas las notas por donde pasa
+  // (desde la presionada hasta donde está el dedo). Cerca de la orilla de
+  // arriba o de abajo, la lista se mueve sola.
+
+  /// La vista donde se está arrastrando (`null` = no se arrastra).
+  GroupFilter? _dragView;
+  String? _dragAnchor;
+  String? _dragCurrent;
+  Set<String> _dragBase = {};
+
+  /// Se empezó sobre una nota ya marcada: arrastrar desmarca.
+  bool _dragUnchecks = false;
+  Offset? _dragPointer;
+  Ticker? _dragTicker;
+  Duration _dragLastTick = Duration.zero;
+
+  /// Una lista con su propio scroll por vista (para moverla sola al
+  /// arrastrar).
+  final Map<String, ScrollController> _listControllers = {};
+  ScrollController _listController(GroupFilter view) =>
+      _listControllers.putIfAbsent(view.encode(), ScrollController.new);
+
+  /// Mantener presionada una nota en [view]:
+  /// - Sin seleccionar nada: se selecciona.
+  /// - Seleccionando, si no estaba marcada: se marca todo el rango desde la
+  ///   última que se marcó hasta esta.
+  /// En los dos casos, sin soltar, se puede arrastrar para marcar más.
+  void _onLongPressNote(Note note, GroupFilter view, Offset position) {
+    HapticFeedback.mediumImpact();
+    final key = _selectionKey(note);
+    final keys = [for (final n in _visibleNotes(view)) _selectionKey(n)];
+    final unchecks = _selecting && _selection.contains(key);
+    setState(() {
+      if (unchecks) {
+        // Ya estaba marcada: se desmarca, y arrastrando se desmarcan las
+        // demás por donde pase el dedo.
+        _dragBase = {..._selection};
+        _selection = {..._selection}..remove(key);
+        if (_lastChecked == key) _lastChecked = null;
+      } else if (!_selecting) {
+        _selection = {key};
+      } else if (!_selection.contains(key)) {
+        final from = _lastChecked == null ? -1 : keys.indexOf(_lastChecked!);
+        final to = keys.indexOf(key);
+        _selection = {
+          ..._selection,
+          if (from >= 0 && to >= 0)
+            ...keys.sublist(math.min(from, to), math.max(from, to) + 1)
+          else
+            key,
+        };
+      }
+      if (!unchecks) _lastChecked = key;
+      _dragView = view;
+    });
+    _dragUnchecks = unchecks;
+    _dragAnchor = key;
+    _dragCurrent = key;
+    if (!unchecks) _dragBase = {..._selection};
+    _dragPointer = position;
+    _dragLastTick = Duration.zero;
+    final ticker = _dragTicker ??= createTicker(_onDragTick);
+    if (!ticker.isActive) ticker.start();
+  }
+
+  void _onDragPointerMove(PointerMoveEvent event) {
+    if (_dragView == null) return;
+    _dragPointer = event.position;
+    _updateDragSelection();
+  }
+
+  void _endDragSelection([PointerEvent? _]) {
+    if (_dragView == null) return;
+    // Si se desmarcaron todas, aquí se sale de la selección.
+    setState(() => _dragView = null);
+    _dragAnchor = null;
+    _dragCurrent = null;
+    _dragPointer = null;
+    _dragUnchecks = false;
+    _dragTicker?.stop();
+  }
+
+  /// La nota bajo el dedo (si hay una).
+  Note? _noteAt(Offset position) {
+    final result = HitTestResult();
+    WidgetsBinding.instance
+        .hitTestInView(result, position, View.of(context).viewId);
+    for (final entry in result.path) {
+      final target = entry.target;
+      if (target is RenderMetaData && target.metaData is _NoteHit) {
+        return (target.metaData as _NoteHit).note;
+      }
     }
+    return null;
+  }
+
+  void _updateDragSelection() {
+    final view = _dragView, pointer = _dragPointer, anchor = _dragAnchor;
+    if (view == null || pointer == null || anchor == null) return;
+    final note = _noteAt(pointer);
+    if (note == null) return;
+    final key = _selectionKey(note);
+    if (key == _dragCurrent) return;
+    final keys = [for (final n in _visibleNotes(view)) _selectionKey(n)];
+    final from = keys.indexOf(anchor), to = keys.indexOf(key);
+    if (from < 0 || to < 0) return;
+    _dragCurrent = key;
+    HapticFeedback.selectionClick();
+    final range = keys.sublist(math.min(from, to), math.max(from, to) + 1);
+    setState(() {
+      if (_dragUnchecks) {
+        _selection = _dragBase.difference(range.toSet());
+      } else {
+        _selection = {..._dragBase, ...range};
+        _lastChecked = key;
+      }
+    });
+  }
+
+  /// Zona de las orillas (arriba y abajo) donde la lista se mueve sola.
+  static const double _dragEdge = 72;
+
+  void _onDragTick(Duration elapsed) {
+    final dt = (elapsed - _dragLastTick).inMicroseconds / 1e6;
+    _dragLastTick = elapsed;
+    final view = _dragView, pointer = _dragPointer;
+    if (view == null || pointer == null || dt <= 0) return;
+    final controller = _listControllers[view.encode()];
+    if (controller == null || !controller.hasClients) return;
+    final position = controller.position;
+    final box = position.context.notificationContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final y = box.globalToLocal(pointer).dy;
+    final height = box.size.height;
+    double depth = 0; // 0 = fuera de la zona, 1 = en la orilla
+    if (y < _dragEdge) {
+      depth = -((_dragEdge - y) / _dragEdge).clamp(0.0, 1.0);
+    } else if (y > height - _dragEdge) {
+      depth = ((y - (height - _dragEdge)) / _dragEdge).clamp(0.0, 1.0);
+    }
+    if (depth == 0) return;
+    // Más rápido mientras más cerca de la orilla.
+    final speed = 150 + 1650 * depth * depth;
+    final target = (position.pixels + depth.sign * speed * dt)
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if (target == position.pixels) return;
+    controller.jumpTo(target);
+    _updateDragSelection();
+  }
+
+  void _selectAll() =>
+      setState(() => _selection = {
+            for (final n in _visibleNotes()) _selectionKey(n),
+          });
+
+  /// Fija las seleccionadas en lo que se ve (o, si ya están todas
+  /// fijadas, las desfija).
+  Future<void> _pinSelected() async {
+    final notes = _selectedNotes;
+    final pin = !notes.every(_isPinned);
+    for (final note in notes) {
+      await _setPinned(note, pin);
+    }
+    _clearSelection();
+  }
+
+  Future<void> _moveSelected() async {
+    var notes = _selectedNotes;
+    if (notes.isEmpty) return;
+    // Si una está abierta en el editor, primero se guarda y se cierra.
+    if (notes.any(_isOpenInPane)) {
+      final latest = _openNote!;
+      if (!await _closePane()) return;
+      notes = [for (final n in notes) _isSameNote(n, latest) ? latest : n];
+    }
+    if (!mounted) return;
+    final groups = {for (final n in notes) n.group};
+    final target = await pickGroupForMove(
+      context,
+      storage: widget.storage,
+      current: groups.length == 1 ? groups.single : null,
+      hasCurrent: groups.length == 1,
+    );
+    if (target == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+    final name = target.group;
+    var moved = 0;
+    try {
+      for (final note in notes) {
+        if (note.group == name) continue;
+        await widget.storage.moveNote(note, name);
+        moved++;
+      }
+      if (moved == 1 && notes.length == 1) {
+        messenger.showMessage(
+            name == null ? l10n.noteMovedToNone : l10n.noteMovedTo(name));
+      } else if (moved > 0) {
+        messenger.showMessage(name == null
+            ? l10n.notesMovedToNone(moved)
+            : l10n.notesMovedTo(moved, name));
+      }
+    } catch (e) {
+      _showError(e);
+    }
+    _clearSelection();
+    await _load();
+  }
+
+  Future<void> _deleteSelected() async {
+    final notes = _selectedNotes;
+    if (notes.isEmpty) return;
+    final l10n = context.l10n;
+    final confirmed = notes.length == 1
+        ? await confirmDeleteNote(context, l10n.displayTitle(notes.single))
+        : await confirmDeleteNotes(context, notes.length);
+    if (!confirmed || !mounted) return;
+    // Si una está abierta en el editor, se cierra sin preguntar: se borra.
+    if (notes.any(_isOpenInPane)) {
+      setState(() {
+        _openNote = null;
+        _editorKey = null;
+      });
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    var deleted = 0;
+    try {
+      for (final note in notes) {
+        await widget.storage.deleteNote(note.fileName!, group: note.group);
+        deleted++;
+      }
+      messenger.showMessage(
+          deleted == 1 ? l10n.noteDeleted : l10n.notesDeleted(deleted));
+    } catch (e) {
+      messenger.showMessage(l10n.deleteError(l10n.errorText(e)),
+          isError: true);
+    }
+    _clearSelection();
+    await _load();
+  }
+
+  bool _isSameNote(Note a, Note b) =>
+      a.fileName == b.fileName && a.group == b.group;
+
+  /// Los botones de la selección: Fijar/Desfijar, Mover, Borrar y
+  /// Seleccionar todas.
+  List<Widget> _selectionActions(BuildContext context) {
+    final l10n = context.l10n;
+    final notes = _selectedNotes;
+    final allPinned = notes.isNotEmpty && notes.every(_isPinned);
+    return [
+      IconButton(
+        key: const ValueKey('selection-pin'),
+        tooltip: allPinned ? l10n.unpinSelected : l10n.pinSelected,
+        icon: Icon(allPinned ? Icons.push_pin : Icons.push_pin_outlined),
+        onPressed: _pinSelected,
+      ),
+      IconButton(
+        key: const ValueKey('selection-move'),
+        tooltip: l10n.moveSelected,
+        icon: const Icon(Icons.drive_file_move_outline),
+        onPressed: _moveSelected,
+      ),
+      IconButton(
+        key: const ValueKey('selection-delete'),
+        tooltip: l10n.deleteSelected,
+        icon: const Icon(Icons.delete_outline),
+        onPressed: _deleteSelected,
+      ),
+      IconButton(
+        key: const ValueKey('selection-all'),
+        tooltip: l10n.selectAll,
+        icon: const Icon(Icons.select_all),
+        onPressed: _selectAll,
+      ),
+    ];
   }
 
   /// Fija (o desfija) una nota en lo que se ve. La lista cambia de
@@ -751,57 +1131,6 @@ class _NotesListScreenState extends State<NotesListScreen> {
       final pins = await widget.storage.listPins();
       if (mounted) setState(() => _pins = pins);
     }
-  }
-
-  Future<void> _move(Note note) async {
-    // Si está abierta en el editor, primero se guarda y se cierra.
-    if (_isOpenInPane(note)) {
-      final latest = _openNote!;
-      if (!await _closePane()) return;
-      note = latest;
-    }
-    if (!mounted) return;
-    final target = await pickGroupForMove(
-      context,
-      storage: widget.storage,
-      current: note.group,
-    );
-    if (target == null || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = context.l10n;
-    try {
-      await widget.storage.moveNote(note, target.group);
-      final name = target.group;
-      messenger.showMessage(
-          name == null ? l10n.noteMovedToNone : l10n.noteMovedTo(name));
-    } catch (e) {
-      _showError(e);
-    }
-    await _load();
-  }
-
-  Future<void> _delete(Note note) async {
-    final confirmed =
-        await confirmDeleteNote(context, context.l10n.displayTitle(note));
-    if (!confirmed || !mounted) return;
-    // Si está abierta en el editor, se cierra sin preguntar: se va a borrar.
-    if (_isOpenInPane(note)) {
-      setState(() {
-        _openNote = null;
-        _editorKey = null;
-      });
-    }
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = context.l10n;
-    try {
-      await widget.storage
-          .deleteNote(note.fileName!, group: note.group);
-      messenger.showMessage(l10n.noteDeleted);
-    } catch (e) {
-      messenger.showMessage(l10n.deleteError(l10n.errorText(e)),
-          isError: true);
-    }
-    await _load();
   }
 
   // ---------------------------------------------------------------------------
@@ -983,8 +1312,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
         },
         // Esc: cerrar la nota abierta en la columna del editor (si el foco
         // está dentro del editor, el propio editor atiende el Esc).
-        const SingleActivator(LogicalKeyboardKey.escape): () =>
-            _editorKey?.currentState?.close(),
+        const SingleActivator(LogicalKeyboardKey.escape): () => _selecting
+            ? _clearSelection()
+            : _editorKey?.currentState?.close(),
       },
       child: Focus(
         focusNode: _shortcutsFocus,
@@ -1025,14 +1355,37 @@ class _NotesListScreenState extends State<NotesListScreen> {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final visible = _visibleNotes().length;
-    return Scaffold(
+    // Seleccionando, "atrás" primero cancela la selección.
+    return PopScope(
+      canPop: !_selecting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _clearSelection();
+      },
+      child: Scaffold(
       // El teclado no encoge esta pantalla: aquí solo lo abre el buscador
       // del panel de grupos, que queda arriba, a la vista. Si la pantalla se
       // encogiera, el panel calcularía su tamaño "cerrado" con el alto
       // pequeño y, al irse el teclado, quedaba cerrado a medias (y se hacía
       // más alto al tocar su buscador).
       resizeToAvoidBottomInset: false,
-      appBar: AppBar(
+      appBar: _selecting
+          ? AppBar(
+              key: const ValueKey('selection-bar'),
+              leading: IconButton(
+                tooltip: l10n.cancelSelection,
+                icon: const Icon(Icons.close),
+                onPressed: _clearSelection,
+              ),
+              title: Text(l10n.selectedCount(_selectedNotes.length)),
+              actions: [..._selectionActions(context), const SizedBox(width: 4)],
+              // Sin "Todas · 59 notas" pero con la misma altura que sin
+              // seleccionar: la lista no se mueve.
+              bottom: const PreferredSize(
+                preferredSize: Size.fromHeight(_summaryBarHeight),
+                child: SizedBox.shrink(),
+              ),
+            )
+          : AppBar(
         titleSpacing: 20,
         // Nombre de la app: no se traduce.
         title: Text(
@@ -1062,49 +1415,23 @@ class _NotesListScreenState extends State<NotesListScreen> {
           ),
           const SizedBox(width: 4),
         ],
-        bottom: !loaded
-            ? null
-            : PreferredSize(
-                preferredSize: const Size.fromHeight(32),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 10, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.listSummary(
-                              _viewLabel(l10n), l10n.notesCount(visible)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                      ),
-                      _buildOrderButton(context),
-                    ],
-                  ),
-                ),
-              ),
+        bottom: !loaded ? null : _buildSummaryBar(context, visible),
       ),
       body: !loaded
           ? _buildBody(context, bottomSpace: 0)
           : Stack(
               children: [
-                Positioned.fill(
-                  child: _buildBody(
-                    context,
-                    // Espacio para el panel de grupos y "Nueva nota", para
-                    // que no tapen la última nota.
-                    bottomSpace: GroupPanel.collapsedHeightOf(context) + 92,
-                  ),
-                ),
+                Positioned.fill(child: _buildPager(context)),
                 // "Nueva nota", a la derecha, justo arriba del panel.
+                // Seleccionando no están ni el botón ni el panel.
+                if (!_selecting)
                 PositionedDirectional(
                   end: 16,
                   bottom: GroupPanel.collapsedHeightOf(context) + 16,
                   child: _buildNewNoteButton(context),
                 ),
                 // El panel va al final: abierto, queda encima de todo.
+                if (!_selecting)
                 Positioned.fill(
                   child: GroupPanel(
                     groups: _groups,
@@ -1119,6 +1446,65 @@ class _NotesListScreenState extends State<NotesListScreen> {
                 ),
               ],
             ),
+    ),
+    );
+  }
+
+  /// Las listas de todas las vistas, una junto a otra: deslizar de lado
+  /// cambia de grupo (en el orden de los chips). Seleccionando no.
+  Widget _buildPager(BuildContext context) {
+    final views = _viewsInOrder;
+    // Si la lista se quitó un rato (ej. el buscador o la vista de PC), se
+    // vuelve a crear en la vista de ahora.
+    if (_pages?.hasClients == false) {
+      _pages!.dispose();
+      _pages = null;
+    }
+    final pages = _pages ??= PageController(
+        initialPage: math.max(0, views.indexOf(_filter)), keepPage: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncPage();
+    });
+    // Espacio para el panel de grupos y "Nueva nota", para que no tapen la
+    // última nota.
+    final bottomSpace = GroupPanel.collapsedHeightOf(context) + 92;
+    return PageView.builder(
+      key: const ValueKey('notes-pager'),
+      controller: pages,
+      physics: _selecting ? const NeverScrollableScrollPhysics() : null,
+      itemCount: views.length,
+      onPageChanged: _onPageChanged,
+      itemBuilder: (context, index) => _buildBody(context,
+          view: views[index], bottomSpace: bottomSpace),
+    );
+  }
+
+  static const double _summaryBarHeight = 32;
+
+  /// Debajo del título: "Todas · 59 notas" y el orden.
+  PreferredSizeWidget _buildSummaryBar(BuildContext context, int visible) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(_summaryBarHeight),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 10, 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.listSummary(
+                    _viewLabel(l10n), l10n.notesCount(visible)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            _buildOrderButton(context),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1319,7 +1705,59 @@ class _NotesListScreenState extends State<NotesListScreen> {
   }
 
   /// Arriba de la lista: qué se ve, cuántas notas, Actualizar y Nueva nota.
+  /// PC seleccionando: ✕ · "3 seleccionadas" · Fijar · Mover · Borrar.
+  Widget _buildWideSelectionHeader(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    return SafeArea(
+      bottom: false,
+      left: false,
+      child: Padding(
+        key: const ValueKey('selection-bar'),
+        padding: const EdgeInsetsDirectional.fromSTEB(8, 16, 16, 8),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: '${l10n.cancelSelection} (Esc)',
+              icon: const Icon(Icons.close),
+              onPressed: _clearSelection,
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                l10n.selectedCount(_selectedNotes.length),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            ..._selectionActions(context),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildWideHeader(BuildContext context) {
+    if (!_selecting) return _buildWideNormalHeader(context);
+    // Seleccionando, el encabezado conserva su altura (el de siempre queda
+    // invisible debajo): la lista no se mueve.
+    return Stack(
+      children: [
+        Visibility(
+          visible: false,
+          maintainSize: true,
+          maintainAnimation: true,
+          maintainState: true,
+          child: _buildWideNormalHeader(context),
+        ),
+        Positioned.fill(child: _buildWideSelectionHeader(context)),
+      ],
+    );
+  }
+
+  Widget _buildWideNormalHeader(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final visible = _visibleNotes().length;
@@ -1402,7 +1840,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   /// La lista de notas, o el mensaje de carga, error o lista vacía.
   /// [bottomSpace]: espacio libre al final (para lo que flota encima).
-  Widget _buildBody(BuildContext context, {required double bottomSpace}) {
+  /// La lista de notas de [view] (por omisión, lo que se ve o donde se
+  /// busca).
+  Widget _buildBody(BuildContext context,
+      {required double bottomSpace, GroupFilter? view}) {
+    final scope = view ?? _scope;
     final theme = Theme.of(context);
     final l10n = context.l10n;
 
@@ -1432,7 +1874,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
 
     final search = _search;
-    final notes = _visibleNotes();
+    final notes = _visibleNotes(scope);
     if (notes.isEmpty) {
       return Center(
         child: Padding(
@@ -1453,13 +1895,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
     // "Por grupo" (en Todas, sin buscar): una sección por grupo.
     final bySections =
-        search.isEmpty && _effectiveOrder == NoteOrder.byGroup;
+        search.isEmpty && _effectiveOrderFor(scope) == NoteOrder.byGroup;
     // El grupo de cada nota se muestra cuando la lista mezcla grupos (en
     // secciones ya lo dice su encabezado).
-    final showGroup = _scope.isAll && !bySections;
+    final showGroup = scope.isAll && !bySections;
     // Con notas fijadas (y sin buscar): "Fijadas" arriba y "Otras" abajo.
     final pinnedCount =
-        search.isEmpty ? notes.takeWhile(_isPinned).length : 0;
+        search.isEmpty
+        ? notes.takeWhile((n) => _isPinnedIn(n, scope)).length
+        : 0;
     final items = <Object>[
       if (pinnedCount > 0) _Section.pinned,
       ...notes.take(pinnedCount),
@@ -1480,7 +1924,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
         ...notes.skip(pinnedCount),
       ],
     ];
-    return ListView.builder(
+    // Escucha el dedo para "arrastrar para seleccionar" (ver
+    // [_onLongPressNote]).
+    return Listener(
+      onPointerMove: _onDragPointerMove,
+      onPointerUp: _endDragSelection,
+      onPointerCancel: _endDragSelection,
+      child: ListView.builder(
+      controller: _listController(scope),
       padding: EdgeInsets.fromLTRB(8, 4, 8, bottomSpace),
       itemCount: items.length,
       itemBuilder: (context, index) {
@@ -1546,8 +1997,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
         }
         final note = item as Note;
         final group = note.group;
-        return NoteRow(
-          pinned: _isPinned(note),
+        return MetaData(
+          metaData: _NoteHit(note),
+          behavior: HitTestBehavior.translucent,
+          child: NoteRow(
+          pinned: _isPinnedIn(note, scope),
           note: note,
           groupColor: group == null ? null : _colorOf(group, theme),
           showGroup: showGroup,
@@ -1558,10 +2012,27 @@ class _NotesListScreenState extends State<NotesListScreen> {
           onToggleMatches: () => _toggleMatches(note),
           onShowMoreMatches: () => _showMoreMatches(note),
           onOpenMatch: (match) => _open(note, match: match),
-          onTap: () => _open(note),
-          onMenu: (position) => _showNoteMenu(note, position),
+          selectionMode: _selecting,
+          checked: _isChecked(note),
+          // Seleccionando: tocar marca o desmarca. En PC, Ctrl+clic también
+          // selecciona.
+          onTap: () => _selecting ||
+                  HardwareKeyboard.instance.isControlPressed
+              ? _toggleSelection(note)
+              : _open(note),
+          onMenu: (_) => _toggleSelection(note),
+          onLongPress: (position) => _onLongPressNote(note, scope, position),
+        ),
         );
       },
+    ),
     );
   }
+}
+
+/// Marca cada fila de nota en la lista, para saber qué nota está bajo el
+/// dedo al arrastrar para seleccionar.
+class _NoteHit {
+  const _NoteHit(this.note);
+  final Note note;
 }
