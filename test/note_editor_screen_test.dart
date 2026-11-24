@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -475,6 +476,144 @@ void main() {
       expect(contentOf(tester).selection.baseOffset, 700);
       // Arriba se ve el mismo renglón (puede variar unos píxeles).
       expect(scrollOf(tester).offset, closeTo(before, 30));
+    });
+  });
+
+  group('zoom del texto', () {
+    final date = DateTime(2026, 11, 23, 18, 0);
+    final long = Note(
+      fileName: '2026-11-23_18-00-00 Larga.txt',
+      title: 'Larga',
+      content: List.generate(120, (i) => 'Renglón número $i').join('\n'),
+      createdAt: date,
+      modifiedAt: date,
+    );
+
+    Future<void> showLong(WidgetTester tester) async {
+      await tester.pumpWidget(localizedApp(
+        NoteEditorScreen(note: long, storage: FakeStorage(), settings: settings),
+        locale: const Locale('es'),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    final contentField = find.byType(TextField).last;
+    double sizeOf(WidgetTester tester) =>
+        tester.widget<TextField>(contentField).style!.fontSize!;
+    double titleSizeOf(WidgetTester tester) =>
+        tester.widget<TextField>(find.byType(TextField).first).style!.fontSize!;
+    ScrollController scrollOf(WidgetTester tester) =>
+        tester.widget<TextField>(contentField).scrollController!;
+    double pillOpacity(WidgetTester tester) => tester
+        .widget<AnimatedOpacity>(find.ancestor(
+            of: find.byKey(const ValueKey('zoom-indicator')),
+            matching: find.byType(AnimatedOpacity)))
+        .opacity;
+
+    Future<void> ctrl(WidgetTester tester, LogicalKeyboardKey key) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(key);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+    }
+
+    testWidgets('Ctrl + / Ctrl − / Ctrl + 0 cambian el tamaño y se recuerda',
+        (tester) async {
+      await showLong(tester);
+      final normal = sizeOf(tester);
+      final normalTitle = titleSizeOf(tester);
+      await tester.tap(contentField);
+      await tester.pump();
+
+      await ctrl(tester, LogicalKeyboardKey.equal);
+      await ctrl(tester, LogicalKeyboardKey.numpadAdd);
+      expect(settings.textZoom, 1.2);
+      expect(sizeOf(tester), closeTo(normal * 1.2, 0.01));
+      // El título también crece.
+      expect(titleSizeOf(tester), closeTo(normalTitle * 1.2, 0.01));
+      // La píldora dice el tamaño y se va sola.
+      expect(find.text('120%'), findsOneWidget);
+      expect(pillOpacity(tester), 1);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(pillOpacity(tester), 0);
+
+      await ctrl(tester, LogicalKeyboardKey.minus);
+      expect(settings.textZoom, 1.1);
+
+      await ctrl(tester, LogicalKeyboardKey.digit0);
+      expect(settings.textZoom, 1.0);
+      expect(sizeOf(tester), closeTo(normal, 0.01));
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('no pasa de los límites (70 % y 200 %)', (tester) async {
+      await settings.setTextZoom(1.95);
+      await showLong(tester);
+      await tester.tap(contentField);
+      await tester.pump();
+      await ctrl(tester, LogicalKeyboardKey.equal);
+      await ctrl(tester, LogicalKeyboardKey.equal);
+      expect(settings.textZoom, AppSettings.maxTextZoom);
+      await ctrl(tester, LogicalKeyboardKey.digit0);
+      for (var i = 0; i < 6; i++) {
+        await ctrl(tester, LogicalKeyboardKey.minus);
+      }
+      expect(settings.textZoom, AppSettings.minTextZoom);
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('Ctrl + rueda hace zoom; la rueda sola desplaza',
+        (tester) async {
+      await showLong(tester);
+      final center = tester.getCenter(contentField);
+      final mouse = TestPointer(1, PointerDeviceKind.mouse)..hover(center);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendEventToBinding(mouse.scroll(const Offset(0, -100)));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(settings.textZoom, 1.1);
+      expect(scrollOf(tester).offset, 0); // no se desplazó
+
+      await tester.sendEventToBinding(mouse.scroll(const Offset(0, 200)));
+      await tester.pumpAndSettle();
+      expect(settings.textZoom, 1.1);
+      expect(scrollOf(tester).offset, greaterThan(0));
+    });
+
+    testWidgets('pellizcar agranda el texto sin perder el renglón de arriba',
+        (tester) async {
+      await showLong(tester);
+      await tester.drag(contentField, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      final before = scrollOf(tester).offset;
+      expect(before, greaterThan(300));
+
+      final center = tester.getCenter(contentField);
+      final a = await tester.startGesture(center - const Offset(0, 50),
+          pointer: 11, kind: PointerDeviceKind.touch);
+      final b = await tester.startGesture(center + const Offset(0, 50),
+          pointer: 12, kind: PointerDeviceKind.touch);
+      await tester.pump();
+      for (var i = 0; i < 4; i++) {
+        await a.moveBy(const Offset(0, -10));
+        await b.moveBy(const Offset(0, 10));
+        await tester.pump();
+      }
+      // De 100 a 180 px entre los dedos: 180 %.
+      expect(find.text('180%'), findsOneWidget);
+      expect(settings.textZoom, 1.0); // aún no se guarda
+      await a.up();
+      await b.up();
+      await tester.pumpAndSettle();
+
+      expect(settings.textZoom, 1.8);
+      // El mismo renglón sigue arriba: todo creció 1.8 veces (el renglón
+      // de arriba empieza un poco antes de donde estaba la orilla).
+      expect(scrollOf(tester).offset,
+          inInclusiveRange((before - 30) * 1.8, before * 1.8 + 15));
+      await tester.pump(const Duration(seconds: 2));
     });
   });
 }

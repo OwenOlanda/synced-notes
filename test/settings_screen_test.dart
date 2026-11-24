@@ -65,6 +65,31 @@ void main() {
     expect(settings.autoCapitalize, isFalse);
   });
 
+  testWidgets('tamaño del texto: − y + de 10 % en 10 % y volver a 100 %',
+      (tester) async {
+    await showSettings(tester, isWindows: false);
+    final value = find.byKey(const ValueKey('text-zoom-value'));
+    await tester.scrollUntilVisible(value, 100,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Tamaño del texto'), findsOneWidget);
+    expect(tester.widget<Text>(value).data, '100%');
+
+    await tester.tap(find.byKey(const ValueKey('text-zoom-in')));
+    await tester.tap(find.byKey(const ValueKey('text-zoom-in')));
+    await tester.pumpAndSettle();
+    expect(settings.textZoom, 1.2);
+    expect(tester.widget<Text>(value).data, '120%');
+
+    await tester.tap(find.byKey(const ValueKey('text-zoom-out')));
+    await tester.pumpAndSettle();
+    expect(settings.textZoom, 1.1);
+
+    await tester.tap(find.byKey(const ValueKey('text-zoom-reset')));
+    await tester.pumpAndSettle();
+    expect(settings.textZoom, 1.0);
+    expect(tester.widget<Text>(value).data, '100%');
+  });
+
   testWidgets('el botón "Abrir en el explorador" solo aparece en Windows',
       (tester) async {
     await showSettings(tester, isWindows: true);

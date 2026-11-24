@@ -525,4 +525,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scrollToBottom => 'Go to bottom';
+
+  @override
+  String get textZoomTitle => 'Text size';
+
+  @override
+  String get textZoomDescription =>
+      'Pinch a note\'s text to change it (on PC: Ctrl + mouse wheel, Ctrl + / Ctrl −; Ctrl + 0 resets it)';
+
+  @override
+  String textZoomPercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get textZoomIn => 'Bigger';
+
+  @override
+  String get textZoomOut => 'Smaller';
+
+  @override
+  String get textZoomReset => 'Back to 100%';
 }

@@ -14,7 +14,8 @@ import '../utils/note_search.dart';
 /// - el tema (claro, oscuro o el del sistema);
 /// - las opciones de búsqueda (Aa, á, ab);
 /// - si el teclado empieza las oraciones con mayúscula;
-/// - dónde se abre una nota y dónde se quedó cada una (en este dispositivo).
+/// - dónde se abre una nota y dónde se quedó cada una (en este dispositivo);
+/// - el tamaño del texto de las notas (zoom, en este dispositivo).
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._prefs);
 
@@ -30,6 +31,7 @@ class AppSettings extends ChangeNotifier {
   static const String _searchCaseKey = 'search_match_case';
   static const String _searchAccentsKey = 'search_match_accents';
   static const String _searchWholeWordKey = 'search_whole_word';
+  static const String _textZoomKey = 'text_zoom';
 
   static Future<AppSettings> load() async =>
       AppSettings._(await SharedPreferences.getInstance());
@@ -117,6 +119,33 @@ class AppSettings extends ChangeNotifier {
     await _prefs.setString(_openPositionKey, position.name);
     notifyListeners();
   }
+
+  /// Zoom del texto de las notas (título y texto): de [minTextZoom] a
+  /// [maxTextZoom], en pasos de [textZoomStep]. 1.0 = 100 % (por defecto).
+  /// Uno solo para todas las notas, en cada dispositivo.
+  static const double minTextZoom = 0.7;
+  static const double maxTextZoom = 2.0;
+  static const double textZoomStep = 0.1;
+
+  double get textZoom => clampTextZoom(_prefs.getDouble(_textZoomKey) ?? 1.0);
+
+  Future<void> setTextZoom(double zoom) async {
+    final value = snapTextZoom(zoom);
+    if (value == textZoom) return;
+    // Se avisa sin esperar a que se escriba en disco: el nuevo tamaño se
+    // dibuja en el siguiente cuadro (y así la nota no "brinca").
+    final saving = _prefs.setDouble(_textZoomKey, value);
+    notifyListeners();
+    await saving;
+  }
+
+  /// Mantiene el zoom dentro de los límites.
+  static double clampTextZoom(double zoom) =>
+      zoom.isFinite ? zoom.clamp(minTextZoom, maxTextZoom).toDouble() : 1.0;
+
+  /// Dentro de los límites y en el paso de 10 % más cercano (1.234 → 1.2).
+  static double snapTextZoom(double zoom) =>
+      (clampTextZoom(zoom) * 10).round() / 10;
 
   /// Cuántas notas recuerdan su posición (las más recientes).
   static const int maxRememberedPositions = 300;

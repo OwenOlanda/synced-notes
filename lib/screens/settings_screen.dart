@@ -123,6 +123,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await widget.settings.setNoteOpenPosition(choice);
   }
 
+  /// "Tamaño del texto": − 120% + y "Volver a 100%".
+  Widget _buildTextZoom(BuildContext context) {
+    final l10n = context.l10n;
+    final zoom = widget.settings.textZoom;
+    // Se lee el zoom al tocar (no al dibujar): dos toques rápidos suben
+    // dos pasos aunque la pantalla aún no se haya redibujado.
+    void change(double delta) =>
+        widget.settings.setTextZoom(widget.settings.textZoom + delta);
+    return Column(
+      key: const ValueKey('text-zoom-tile'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListTile(
+          leading: const Icon(Icons.format_size),
+          title: Text(l10n.textZoomTitle),
+          subtitle: Text(l10n.textZoomDescription),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(60, 0, 16, 8),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            children: [
+              IconButton(
+                key: const ValueKey('text-zoom-out'),
+                tooltip: l10n.textZoomOut,
+                icon: const Icon(Icons.remove),
+                onPressed: zoom > AppSettings.minTextZoom + 0.001
+                    ? () => change(-AppSettings.textZoomStep)
+                    : null,
+              ),
+              SizedBox(
+                width: 52,
+                child: Text(
+                  l10n.textZoomPercent((zoom * 100).round()),
+                  key: const ValueKey('text-zoom-value'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('text-zoom-in'),
+                tooltip: l10n.textZoomIn,
+                icon: const Icon(Icons.add),
+                onPressed: zoom < AppSettings.maxTextZoom - 0.001
+                    ? () => change(AppSettings.textZoomStep)
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                key: const ValueKey('text-zoom-reset'),
+                onPressed: zoom != 1.0
+                    ? () => widget.settings.setTextZoom(1.0)
+                    : null,
+                child: Text(l10n.textZoomReset),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Texto del tema actual, ej. "Del sistema (Oscuro)" o "Claro".
   String _currentThemeLabel(AppLocalizations l10n) {
     switch (widget.settings.themeMode) {
@@ -238,6 +301,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   l10n, widget.settings.noteOpenPosition)),
               onTap: _chooseOpenPosition,
             ),
+          ),
+          ListenableBuilder(
+            listenable: widget.settings,
+            builder: (context, _) => _buildTextZoom(context),
           ),
           const Divider(),
           _SectionHeader(l10n.settingsSectionNotesLocation),

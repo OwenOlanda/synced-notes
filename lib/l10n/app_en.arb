@@ -483,5 +483,22 @@
   "scrollToTop": "Go to top",
   "@scrollToTop": {"description": "Tooltip of the round button that jumps to the beginning of the note."},
   "scrollToBottom": "Go to bottom",
-  "@scrollToBottom": {"description": "Tooltip of the round button that jumps to the end of the note."}
+  "@scrollToBottom": {"description": "Tooltip of the round button that jumps to the end of the note."},
+  "textZoomTitle": "Text size",
+  "@textZoomTitle": {"description": "Settings → Writing: size (zoom) of the title and text of notes."},
+  "textZoomDescription": "Pinch a note's text to change it (on PC: Ctrl + mouse wheel, Ctrl + / Ctrl −; Ctrl + 0 resets it)",
+  "@textZoomDescription": {"description": "Settings → Writing: how to change the text size from a note."},
+  "textZoomPercent": "{percent}%",
+  "@textZoomPercent": {
+    "description": "Text size as a percentage (100% = normal). Shown in Settings and in the little pill while zooming.",
+    "placeholders": {
+      "percent": {"type": "int", "example": "120"}
+    }
+  },
+  "textZoomIn": "Bigger",
+  "@textZoomIn": {"description": "Settings → Text size: button that makes the text bigger."},
+  "textZoomOut": "Smaller",
+  "@textZoomOut": {"description": "Settings → Text size: button that makes the text smaller."},
+  "textZoomReset": "Back to 100%",
+  "@textZoomReset": {"description": "Settings → Text size: button that returns the text to its normal size."}
 }

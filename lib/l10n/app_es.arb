@@ -143,5 +143,11 @@
   "openPositionEnd": "Al final",
   "openPositionLast": "Donde me quedé",
   "scrollToTop": "Ir al inicio",
-  "scrollToBottom": "Ir al final"
+  "scrollToBottom": "Ir al final",
+  "textZoomTitle": "Tamaño del texto",
+  "textZoomDescription": "Pellizca el texto de una nota para cambiarlo (en PC: Ctrl + rueda del mouse, Ctrl + / Ctrl −; Ctrl + 0 lo regresa)",
+  "textZoomPercent": "{percent}%",
+  "textZoomIn": "Más grande",
+  "textZoomOut": "Más chico",
+  "textZoomReset": "Volver a 100%"
 }

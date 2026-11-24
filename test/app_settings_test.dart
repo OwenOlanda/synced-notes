@@ -112,4 +112,17 @@ void main() {
     expect(settings.notePositionOf('n0'), isNull); // la más vieja se fue
     expect(settings.notePositionOf('n$max')!.cursor, max);
   });
+
+  test('zoom del texto: 100 % por defecto, en pasos de 10 % y con límites',
+      () async {
+    final settings = await AppSettings.load();
+    expect(settings.textZoom, 1.0);
+    await settings.setTextZoom(1.234); // se acomoda en el paso más cercano
+    expect(settings.textZoom, 1.2);
+    expect((await AppSettings.load()).textZoom, 1.2);
+    await settings.setTextZoom(5);
+    expect(settings.textZoom, AppSettings.maxTextZoom);
+    await settings.setTextZoom(0.1);
+    expect(settings.textZoom, AppSettings.minTextZoom);
+  });
 }

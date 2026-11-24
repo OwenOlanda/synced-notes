@@ -2,7 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show AppExitResponse;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart' show Simulation;
+import 'package:flutter/rendering.dart' show RenderEditable;
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../l10n/l10n.dart';
@@ -195,7 +199,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
       _contentScroll.position.hasContentDimensions;
 
   void _onContentScroll() {
-    if (!_scrollReady) return;
+    if (_anchoring || !_scrollReady) return;
     if (_contentScroll.position.maxScrollExtent <= 0) return;
     _jumpVisible.value = true;
     _jumpHideTimer?.cancel();
@@ -220,13 +224,44 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  /// Mide dónde está la nota: el cursor y la letra que se ve hasta arriba.
-  void _measurePosition() {
+  /// La letra que se ve hasta arriba del texto (`null` = aún no se sabe).
+  int? _topChar() {
     final editable = _contentEditable()?.renderEditable;
-    if (editable == null || !editable.attached || !editable.hasSize) return;
-    final top = editable
+    if (editable == null || !editable.attached || !editable.hasSize) {
+      return null;
+    }
+    return editable
         .getPositionForPoint(editable.localToGlobal(const Offset(1, 1)))
         .offset;
+  }
+
+  /// Desplaza el texto para que la letra [char] quede hasta arriba.
+  void _scrollToChar(int char) {
+    if (!_scrollReady) return;
+    final editable = _contentEditable()?.renderEditable;
+    if (editable == null || !editable.hasSize) return;
+    final text = _content.text;
+    final top = NoteSearch.safeCut(text, char.clamp(0, text.length).toInt());
+    final scroll = _contentScroll.position;
+    // La primera letra: hasta arriba exacto (el cursor empieza un poquito
+    // más abajo de su renglón y dejaba la nota movida una fracción).
+    final y = top == 0
+        ? 0.0
+        : editable.getLocalRectForCaret(TextPosition(offset: top)).top +
+            scroll.pixels;
+    _anchoring = true;
+    _contentScroll.jumpTo(y.clamp(0.0, scroll.maxScrollExtent).toDouble());
+    _anchoring = false;
+  }
+
+  /// Se está desplazando el texto desde el código (no la persona): no se
+  /// muestra el botón ↑/↓.
+  bool _anchoring = false;
+
+  /// Mide dónde está la nota: el cursor y la letra que se ve hasta arriba.
+  void _measurePosition() {
+    final top = _topChar();
+    if (top == null) return;
     final selection = _content.selection;
     _position = NotePosition(
       cursor: selection.isValid ? selection.baseOffset : 0,
@@ -264,17 +299,175 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
         _content.selection = TextSelection.collapsed(
             offset: NoteSearch.safeCut(
                 text, saved.cursor.clamp(0, text.length).toInt()));
-        final editable = _contentEditable()?.renderEditable;
-        if (editable == null || !editable.hasSize) return;
-        final top = NoteSearch.safeCut(
-            text, saved.topChar.clamp(0, text.length).toInt());
-        final y = editable
-                .getLocalRectForCaret(TextPosition(offset: top))
-                .top +
-            scroll.pixels;
-        _contentScroll
-            .jumpTo(y.clamp(0.0, scroll.maxScrollExtent).toDouble());
+        _scrollToChar(saved.topChar);
     }
+  }
+
+  // Zoom del texto: pellizcar (celular o touchpad), Ctrl + rueda, Ctrl ± 0 --
+
+  /// El zoom mientras se pellizca (todavía sin guardar). `null` = no se
+  /// está pellizcando: vale el de Ajustes.
+  double? _pinchZoom;
+  bool get _pinching => _pinchZoom != null;
+  double get _zoom => _pinchZoom ?? widget.settings.textZoom;
+
+  /// Dedos sobre la nota (solo pantalla táctil) y cómo empezó el pellizco.
+  final Map<int, Offset> _touches = {};
+  double _pinchStartDistance = 1;
+  double _pinchStartZoom = 1;
+
+  /// La letra que estaba hasta arriba al empezar a hacer zoom: se mantiene
+  /// a la vista mientras el texto crece o se encoge. Se acomoda en el mismo
+  /// cuadro en que cambia el tamaño (ver [_NoteScrollPhysics]): si se
+  /// acomodara después, se vería un cuadro en el lugar equivocado (parpadeo).
+  int? _zoomAnchor;
+  RenderEditable? _zoomEditable;
+
+  void _setAnchor() {
+    _zoomAnchor = _topChar();
+    _zoomEditable = _contentEditable()?.renderEditable;
+  }
+
+  /// Dónde debe quedar el desplazamiento para que [_zoomAnchor] siga hasta
+  /// arriba. Flutter lo pregunta mientras acomoda el texto con su nuevo
+  /// tamaño; [pixels] es el desplazamiento de antes. `null` = sin zoom.
+  double? _anchorPixels(double pixels) {
+    final anchor = _zoomAnchor;
+    final editable = _zoomEditable;
+    if (anchor == null || editable == null || !editable.attached) return null;
+    if (anchor == 0) return 0;
+    final text = _content.text;
+    final top = NoteSearch.safeCut(text, anchor.clamp(0, text.length).toInt());
+    if (top >= text.length) return null;
+    // La caja de esa letra (no la del cursor: medir el cursor pregunta por
+    // la posición en pantalla, y eso no se puede mientras se acomoda).
+    final boxes = editable.getBoxesForSelection(TextSelection(
+        baseOffset: top,
+        extentOffset: NoteSearch.safeCut(text, top + 1) == top
+            ? math.min(top + 2, text.length)
+            : top + 1));
+    if (boxes.isNotEmpty) return boxes.first.top + pixels;
+    // Renglón vacío (solo el salto de línea): empieza donde termina la
+    // letra anterior.
+    if (top == 0) return null;
+    final before = editable.getBoxesForSelection(TextSelection(
+        baseOffset: NoteSearch.safeCut(text, top - 1), extentOffset: top));
+    return before.isEmpty ? null : before.last.bottom + pixels;
+  }
+
+  /// Después del cuadro con el tamaño final, se suelta la letra de arriba
+  /// (y se vuelve a medir la nota para que la barra de la derecha se
+  /// ponga al día).
+  void _releaseAnchorAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _pinching) return;
+      final editable = _zoomEditable;
+      _zoomAnchor = null;
+      _zoomEditable = null;
+      if (editable != null && editable.attached) editable.markNeedsLayout();
+    });
+  }
+
+  /// La píldora "120%" se ve mientras se hace zoom y un segundo después.
+  final ValueNotifier<bool> _zoomPillVisible = ValueNotifier(false);
+  Timer? _zoomPillTimer;
+  static const Duration _zoomPillFor = Duration(seconds: 1);
+
+  void _showZoomPill({bool stay = false}) {
+    _zoomPillVisible.value = true;
+    _zoomPillTimer?.cancel();
+    if (!stay) {
+      _zoomPillTimer =
+          Timer(_zoomPillFor, () => _zoomPillVisible.value = false);
+    }
+  }
+
+  /// Ctrl + rueda, Ctrl + / Ctrl − y los botones: de 10 % en 10 %.
+  void _zoomBy(double delta) => _setZoom(widget.settings.textZoom + delta);
+
+  /// Ctrl + 0: tamaño normal.
+  void _resetZoom() => _setZoom(1.0);
+
+  void _setZoom(double zoom) {
+    if (_pinching) return;
+    _showZoomPill();
+    final value = AppSettings.snapTextZoom(zoom);
+    if (value == widget.settings.textZoom) return;
+    if (_zoomAnchor == null) _setAnchor();
+    widget.settings.setTextZoom(value);
+    setState(() {});
+    _releaseAnchorAfterFrame();
+  }
+
+  void _beginPinch() {
+    _pinchStartZoom = widget.settings.textZoom;
+    _setAnchor();
+    setState(() => _pinchZoom = _pinchStartZoom);
+    _showZoomPill(stay: true);
+  }
+
+  void _updatePinch(double scale) {
+    final zoom = AppSettings.clampTextZoom(_pinchStartZoom * scale);
+    if ((zoom - _zoom).abs() < 0.004) return;
+    setState(() => _pinchZoom = zoom);
+  }
+
+  /// Al soltar: se acomoda en el 10 % más cercano y se guarda.
+  void _endPinch() {
+    final zoom = _pinchZoom;
+    if (zoom == null) return;
+    widget.settings.setTextZoom(zoom); // lo acomoda en pasos de 10 %
+    setState(() => _pinchZoom = null);
+    _releaseAnchorAfterFrame();
+    _showZoomPill();
+  }
+
+  double get _touchDistance {
+    final points = _touches.values.take(2).toList();
+    return (points[0] - points[1]).distance;
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _touches[event.pointer] = event.position;
+    if (_touches.length == 2 && !_pinching) {
+      _pinchStartDistance = math.max(_touchDistance, 1.0);
+      _beginPinch();
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!_touches.containsKey(event.pointer)) return;
+    _touches[event.pointer] = event.position;
+    if (_pinching && _touches.length >= 2) {
+      _updatePinch(_touchDistance / _pinchStartDistance);
+    }
+  }
+
+  void _onPointerUp(PointerEvent event) {
+    if (_touches.remove(event.pointer) == null) return;
+    if (_pinching && _touches.length < 2) _endPinch();
+  }
+
+  /// Ctrl + rueda del mouse (la rueda sola sigue desplazando el texto).
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    if (!HardwareKeyboard.instance.isControlPressed) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (event) {
+      final dy = (event as PointerScrollEvent).scrollDelta.dy;
+      if (dy == 0) return;
+      _zoomBy(dy < 0 ? AppSettings.textZoomStep : -AppSettings.textZoomStep);
+    });
+  }
+
+  // Pellizcar en el touchpad de la laptop (llega como "pan/zoom").
+  void _onPanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    if (!_pinching && (event.scale - 1).abs() > 0.03) _beginPinch();
+    if (_pinching && _touches.isEmpty) _updatePinch(event.scale);
+  }
+
+  void _onPanZoomEnd(PointerPanZoomEndEvent event) {
+    if (_pinching && _touches.isEmpty) _endPinch();
   }
 
   Timer? _autosaveTimer;
@@ -341,6 +534,8 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     _jumpHideTimer?.cancel();
     _contentScroll.dispose();
     _jumpVisible.dispose();
+    _zoomPillTimer?.cancel();
+    _zoomPillVisible.dispose();
     super.dispose();
   }
 
@@ -857,6 +1052,11 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
     ];
   }
 
+  /// [style] con el zoom del texto aplicado.
+  TextStyle? _zoomed(TextStyle? style, double normalSize) =>
+      (style ?? const TextStyle())
+          .copyWith(fontSize: (style?.fontSize ?? normalSize) * _zoom);
+
   /// Título y texto de la nota.
   /// [side]: el margen a los lados, **dentro** de los campos: así un toque
   /// en el espacio en blanco a la izquierda de un renglón pone el cursor
@@ -889,7 +1089,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
           undoController: _titleUndo,
           textCapitalization: capitalization,
           autofocus: !_note.isSaved, // nota nueva: empieza en el título
-          style: theme.textTheme.headlineSmall,
+          style: _zoomed(theme.textTheme.headlineSmall, 24),
           decoration: InputDecoration(
             hintText: l10n.titleHint,
             border: InputBorder.none,
@@ -933,7 +1133,12 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
             expands: true,
             keyboardType: TextInputType.multiline,
             textAlignVertical: TextAlignVertical.top,
-            style: theme.textTheme.bodyLarge,
+            style: _zoomed(theme.textTheme.bodyLarge, 16),
+            // Mientras se pellizca, el texto no se desplaza.
+            scrollPhysics: _NoteScrollPhysics(
+              frozen: () => _pinching,
+              anchorPixels: _anchorPixels,
+            ),
             decoration: InputDecoration(
               hintText: l10n.contentHint,
               border: InputBorder.none,
@@ -956,6 +1161,7 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
       {required double right}) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final percent = (AppSettings.snapTextZoom(_zoom) * 100).round();
     return NotificationListener<ScrollEndNotification>(
       onNotification: (_) {
         _measurePosition();
@@ -963,7 +1169,65 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
       },
       child: Stack(
         children: [
-          Positioned.fill(child: fields),
+          Positioned.fill(
+            // Zoom: dos dedos (pellizco), touchpad y Ctrl + rueda. El
+            // Listener ve todos los dedos sin competir con los gestos del
+            // texto; el reconocedor de dos dedos solo evita que, al
+            // pellizcar, el texto crea que se está seleccionando.
+            child: Listener(
+              onPointerDown: _onPointerDown,
+              onPointerMove: _onPointerMove,
+              onPointerUp: _onPointerUp,
+              onPointerCancel: _onPointerUp,
+              onPointerSignal: _onPointerSignal,
+              onPointerPanZoomUpdate: _onPanZoomUpdate,
+              onPointerPanZoomEnd: _onPanZoomEnd,
+              child: RawGestureDetector(
+                gestures: {
+                  _TwoFingerClaim:
+                      GestureRecognizerFactoryWithHandlers<_TwoFingerClaim>(
+                    _TwoFingerClaim.new,
+                    (_) {},
+                  ),
+                },
+                child: fields,
+              ),
+            ),
+          ),
+          // Píldora con el tamaño ("120%") mientras se hace zoom.
+          Positioned(
+            top: 8,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _zoomPillVisible,
+                builder: (context, visible, _) => IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: visible ? 1 : 0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Material(
+                      key: const ValueKey('zoom-indicator'),
+                      color: scheme.inverseSurface,
+                      shape: const StadiumBorder(),
+                      elevation: 2,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        child: Text(
+                          l10n.textZoomPercent(percent),
+                          style: TextStyle(
+                            color: scheme.onInverseSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
           PositionedDirectional(
             end: right,
             bottom: 16,
@@ -1261,6 +1525,29 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
           // Ctrl+F dentro de la nota: buscar en esta nota.
           const SingleActivator(LogicalKeyboardKey.keyF, control: true):
               _openFind,
+          // Zoom del texto: Ctrl + / Ctrl − / Ctrl + 0 (como el navegador).
+          // "+" puede ser su propia tecla (teclado en español), Shift + "="
+          // (teclado en inglés) o el del teclado numérico.
+          const SingleActivator(LogicalKeyboardKey.add, control: true): () =>
+              _zoomBy(AppSettings.textZoomStep),
+          const SingleActivator(LogicalKeyboardKey.add,
+              control: true, shift: true): () =>
+              _zoomBy(AppSettings.textZoomStep),
+          const SingleActivator(LogicalKeyboardKey.equal, control: true): () =>
+              _zoomBy(AppSettings.textZoomStep),
+          const SingleActivator(LogicalKeyboardKey.equal,
+              control: true, shift: true): () =>
+              _zoomBy(AppSettings.textZoomStep),
+          const SingleActivator(LogicalKeyboardKey.numpadAdd, control: true):
+              () => _zoomBy(AppSettings.textZoomStep),
+          const SingleActivator(LogicalKeyboardKey.minus, control: true): () =>
+              _zoomBy(-AppSettings.textZoomStep),
+          const SingleActivator(LogicalKeyboardKey.numpadSubtract,
+              control: true): () => _zoomBy(-AppSettings.textZoomStep),
+          const SingleActivator(LogicalKeyboardKey.digit0, control: true):
+              _resetZoom,
+          const SingleActivator(LogicalKeyboardKey.numpad0, control: true):
+              _resetZoom,
           // Esc cierra la nota (igual que la X o la flecha de regresar);
           // con la barra de búsqueda abierta, primero cierra la barra.
           const SingleActivator(LogicalKeyboardKey.escape): () =>
@@ -1270,4 +1557,109 @@ class NoteEditorScreenState extends State<NoteEditorScreen> {
       ),
     );
   }
+}
+
+/// Desplazamiento del texto de la nota: igual que siempre, salvo que
+/// - mientras se pellizca ([frozen]), los dedos no lo desplazan;
+/// - con Ctrl presionado, la rueda del mouse no desplaza (hace zoom);
+/// - al cambiar el tamaño del texto (zoom), se queda arriba el mismo
+///   renglón ([anchorPixels]), en el mismo cuadro, sin parpadeo.
+class _NoteScrollPhysics extends ScrollPhysics {
+  const _NoteScrollPhysics({
+    super.parent,
+    required this.frozen,
+    required this.anchorPixels,
+  });
+
+  final bool Function() frozen;
+  final double? Function(double pixels) anchorPixels;
+
+  @override
+  _NoteScrollPhysics applyTo(ScrollPhysics? ancestor) => _NoteScrollPhysics(
+        parent: buildParent(ancestor),
+        frozen: frozen,
+        anchorPixels: anchorPixels,
+      );
+
+  @override
+  double adjustPositionForNewDimensions({
+    required ScrollMetrics oldPosition,
+    required ScrollMetrics newPosition,
+    required bool isScrolling,
+    required double velocity,
+  }) {
+    final target = anchorPixels(newPosition.pixels);
+    if (target != null) {
+      return target
+          .clamp(newPosition.minScrollExtent, newPosition.maxScrollExtent)
+          .toDouble();
+    }
+    return super.adjustPositionForNewDimensions(
+      oldPosition: oldPosition,
+      newPosition: newPosition,
+      isScrolling: isScrolling,
+      velocity: velocity,
+    );
+  }
+
+  @override
+  bool shouldAcceptUserOffset(ScrollMetrics position) {
+    // Solo para la rueda (llega fuera de los cuadros). Durante un cuadro
+    // Flutter pregunta esto para decidir si se puede arrastrar el texto
+    // (touchpad, pantalla táctil): ahí Ctrl no cuenta, si no el texto se
+    // quedaba sin poder arrastrarse después de Ctrl + rueda.
+    final inFrame = SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks;
+    if (!inFrame && HardwareKeyboard.instance.isControlPressed) return false;
+    return super.shouldAcceptUserOffset(position);
+  }
+
+  @override
+  double applyPhysicsToUserOffset(ScrollMetrics position, double offset) =>
+      frozen() ? 0 : super.applyPhysicsToUserOffset(position, offset);
+
+  @override
+  Simulation? createBallisticSimulation(
+          ScrollMetrics position, double velocity) =>
+      frozen() ? null : super.createBallisticSimulation(position, velocity);
+}
+
+/// Se queda con los dedos en cuanto hay dos sobre la nota (un pellizco),
+/// para que el texto no lo tome como seleccionar o mover el cursor. Con un
+/// solo dedo nunca gana: tocar, desplazar y seleccionar funcionan igual.
+class _TwoFingerClaim extends OneSequenceGestureRecognizer {
+  _TwoFingerClaim()
+      : super(supportedDevices: const {PointerDeviceKind.touch});
+
+  final Set<int> _pointers = {};
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    _pointers.add(event.pointer);
+    if (_pointers.length >= 2) resolve(GestureDisposition.accepted);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _pointers.remove(event.pointer);
+      stopTrackingPointer(event.pointer);
+    }
+  }
+
+  @override
+  void rejectGesture(int pointer) {
+    _pointers.remove(pointer);
+    stopTrackingPointer(pointer);
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    _pointers.clear();
+    resolve(GestureDisposition.rejected);
+  }
+
+  @override
+  String get debugDescription => 'pellizco';
 }

@@ -961,6 +961,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go to bottom'**
   String get scrollToBottom;
+
+  /// Settings → Writing: size (zoom) of the title and text of notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get textZoomTitle;
+
+  /// Settings → Writing: how to change the text size from a note.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinch a note\'s text to change it (on PC: Ctrl + mouse wheel, Ctrl + / Ctrl −; Ctrl + 0 resets it)'**
+  String get textZoomDescription;
+
+  /// Text size as a percentage (100% = normal). Shown in Settings and in the little pill while zooming.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}%'**
+  String textZoomPercent(int percent);
+
+  /// Settings → Text size: button that makes the text bigger.
+  ///
+  /// In en, this message translates to:
+  /// **'Bigger'**
+  String get textZoomIn;
+
+  /// Settings → Text size: button that makes the text smaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Smaller'**
+  String get textZoomOut;
+
+  /// Settings → Text size: button that returns the text to its normal size.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to 100%'**
+  String get textZoomReset;
 }
 
 class _AppLocalizationsDelegate
